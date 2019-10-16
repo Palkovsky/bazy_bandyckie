@@ -1,0 +1,245 @@
+#+TITLE: Oracle PL/SQL - Sprawozdanie
+#+LANGUAGE: pl
+#+OPTIONS: date:nil
+#+LATEX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
+
+* Schemat bazy
+   Kod użyty do wygenerowania schematu bazy danych został skopiowany z dokumentu z zadaniami.
+   #+begin_src sql
+   CREATE TABLE OSOBY (
+   ID_OSOBY INT GENERATED ALWAYS AS IDENTITY NOT NULL,
+   IMIE VARCHAR2(50),
+   NAZWISKO VARCHAR2(50),
+   PESEL VARCHAR2(11),
+   KONTAKT VARCHAR2(100),
+   CONSTRAINT OSOBY_PK PRIMARY KEY (ID_OSOBY) ENABLE
+   );
+
+   CREATE TABLE WYCIECZKI (
+   ID_WYCIECZKI INT GENERATED ALWAYS AS IDENTITY NOT NULL,
+   NAZWA VARCHAR2(100),
+   KRAJ VARCHAR2(50),
+   DATA DATE,
+   OPIS VARCHAR2(200),
+   LICZBA_MIEJSC INT,
+   CONSTRAINT WYCIECZKI_PK PRIMARY KEY (ID_WYCIECZKI) ENABLE
+   );
+
+   CREATE TABLE REZERWACJE (
+   NR_REZERWACJI INT GENERATED ALWAYS AS IDENTITY NOT NULL,
+   ID_WYCIECZKI INT,
+   ID_OSOBY INT,
+   STATUS CHAR(1),
+   CONSTRAINT REZERWACJE_PK PRIMARY KEY (NR_REZERWACJI) ENABLE
+   );
+
+   ALTER TABLE REZERWACJE 
+   ADD CONSTRAINT REZERWACJE_FK1 
+   FOREIGN KEY (ID_OSOBY)
+   REFERENCES OSOBY (ID_OSOBY)
+   ENABLE;
+   
+   ALTER TABLE REZERWACJE
+   ADD CONSTRAINT REZERWACJE_FK2 FOREIGN KEY (ID_WYCIECZKI)
+   REFERENCES WYCIECZKI (ID_WYCIECZKI)
+   ENABLE;
+   
+   ALTER TABLE REZERWACJE
+   ADD CONSTRAINT REZERWACJE_CHK1 CHECK (status IN ('N','P','Z','A'))
+   ENABLE;
+   #+end_src
+   
+* Przykładowe dane
+   Baza ma zawierać:
+   - 4 wycieczki
+   - 10 osób
+   - 10 rezerwacji
+
+   #+begin_src sql
+/* OSOBY */
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Adam', 'Kowalski', '87654321', 'tel: 6623');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Jan', 'Nowak', '12345678', 'tel: 2312, dzwonić po 18.00');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Wacław', 'Frydrych', '489712678', 'frydrych@agh.edu.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Mariusz', 'Meszka', '237894156', 'meszka@agh.edu.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Marek', 'Gajęcki', '731648726', 'mgajecki@agh.edu.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Jarosław', 'Koźlak', '157894635', 'kozlak@agh.edu.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Piotr', 'Faliszewski', '712347596', 'faliszw@agh.edu.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Robert', 'Marcjan', '712456389', 'marcjan@agh.edu.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Robert', 'Kubica', '487123549', 'robert@orlen.pl');
+INSERT INTO osoby (imie, nazwisko, pesel, kontakt)
+    VALUES('Rafał', 'Juraszek', '45978123', 'rafal@gmail.com');
+
+/* WYCIECZKI */
+INSERT INTO wycieczki (nazwa, kraj, data, opis, liczba_miejsc) VALUES (
+  'Wycieczka do Paryza',
+  'Francja', 
+  TO_DATE('2019-01-01','YYYY-MM-DD'),
+  'Ciekawa wycieczka ...',
+  3
+);
+INSERT INTO wycieczki (nazwa, kraj, data, opis, liczba_miejsc) VALUES (
+  'Piękny Kraków',
+  'Polska',
+  TO_DATE('2020-02-03','YYYY-MM-DD'),
+  'Najciekawa wycieczka ...',
+  2
+);
+INSERT INTO wycieczki (nazwa, kraj, data, opis, liczba_miejsc) VALUES (
+  'Wieliczka',
+  'Polska', 
+  TO_DATE('2020-03-03','YYYY-MM-DD'),
+  'Zadziwiająca kopalnia ...',
+  2
+);
+INSERT INTO wycieczki (nazwa, kraj, data, opis, liczba_miejsc) VALUES (
+  'Wycieczka do Londynu',
+  'Anglia',
+  TO_DATE('2020-04-03','YYYY-MM-DD'),
+  'Lux wycieczka, Big Ben i takie tam.', 
+  4
+);
+
+/* REZERWACJE */
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (1,1,'N');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (2,2,'P');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (2,4,'A');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (4,9,'Z');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (4,3,'P');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (4,8,'P');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (3,5,'N');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (3,1,'Z');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (4,7,'N');
+INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (1,3,'N');
+   #+end_src
+
+* Widoki
+  Tworzenie widoków. Należy przygotować kilka widoków ułatwiających dostęp do danych.
+
+** wycieczki​_osoby
+   Widok łączy informacje o wycieczkach z uczestnikami na podstawie rezerwacji.
+   #+begin_src sql
+   CREATE VIEW wycieczki_osoby
+   AS
+    SELECT
+        w.ID_WYCIECZKI,
+        w.NAZWA,
+        w.KRAJ,
+        w.DATA,
+        o.IMIE,
+        o.NAZWISKO,
+        r.STATUS
+    FROM
+         WYCIECZKI w
+    JOIN
+        REZERWACJE r ON w.ID_WYCIECZKI = r.ID_WYCIECZKI
+    JOIN
+        OSOBY o ON r.ID_OSOBY = o.ID_OSOBY;
+   #+end_src
+
+** wycieczki​_osoby​_potwierdzone
+   Widok zwraca informacje o potwierdzonych uczestnikach, czyli tych którzy potwierdzili i zapłacili.
+
+   #+begin_src sql
+CREATE VIEW wycieczki_osoby_potwierdzone
+ AS
+    SELECT
+        *
+    FROM
+         wycieczki_osoby
+    WHERE
+         STATUS = 'Z';
+   #+end_src
+
+** wycieczki​_przyszle
+   Informacje o wycieczkach, które jeszcze się nie odbyły oraz ich uczestnikach.
+   #+begin_src sql
+CREATE VIEW wycieczki_przyszle
+ AS
+    SELECT
+        *
+    FROM
+      wycieczki_osoby
+    WHERE
+       DATA > CURRENT_DATE;
+   #+end_src
+
+** wycieczki​_miejsca
+   Zwraca informacje o zajętości miejsc poszczególnych wycieczek. Jeśli jakaś rezerwacja została anulowana, to uznajemy że miejsce jest wolne.
+   #+begin_src sql
+CREATE VIEW wycieczki_miejsca
+ AS
+    SELECT
+        w.ID_WYCIECZKI,
+        w.NAZWA,
+        w.KRAJ,
+        w.DATA,
+        w.LICZBA_MIEJSC,
+        w.LICZBA_MIEJSC - COUNT(r.ID_WYCIECZKI) as LICZBA_WOLNYCH_MIEJSC
+ FROM
+      WYCIECZKI w
+ INNER JOIN
+      REZERWACJE r ON w.ID_WYCIECZKI = r.ID_WYCIECZKI
+ WHERE
+       r.STATUS != 'A'
+ GROUP BY
+          w.ID_WYCIECZKI, w.NAZWA, w.KRAJ, w.DATA, w.LICZBA_MIEJSC;   
+   #+end_src
+
+** dostepne​_wycieczki
+   Zwraca informacje o wycieczkach, które jeszcze się nie odbyły i mają wolne miejsca.
+   #+begin_src sql
+CREATE VIEW dostepne_wycieczki
+ AS
+    SELECT
+           *
+    FROM
+        wycieczki_miejsca
+    WHERE
+        LICZBA_WOLNYCH_MIEJSC > 0 AND DATA > CURRENT_DATE;   
+   #+end_src
+
+** rezerwacje​_do​_anulowania 
+   Lista niepotwierdzonych rezerwacji które powinne zostać anulowane, rezerwacje przygotowywane są do anulowania na tydzień przed wyjazdem.
+   #+begin_src sql
+CREATE VIEW rezerwacje_do_anulowania
+  AS
+    SELECT DISTINCT
+        r.NR_REZERWACJI,
+        r.ID_WYCIECZKI,
+        r.ID_OSOBY,
+        w.NAZWA,
+        w.DATA,
+        o.IMIE,
+        o.NAZWISKO,
+        o.KONTAKT
+    FROM
+        REZERWACJE r
+    INNER JOIN
+        OSOBY O on r.ID_OSOBY = O.ID_OSOBY
+    INNER JOIN
+        WYCIECZKI W on r.ID_WYCIECZKI = W.ID_WYCIECZKI
+    WHERE
+        w.DATA - CURRENT_DATE <= 7 AND r.STATUS != 'Z';
+   #+end_src
+
+* Procedury pobierające dane
+  
+** uczestnicy​_wycieczki(id​_wycieczki)
+   Procedura zwraca zestaw danych identyczny do tego z widoku ~wycieczki_osoby~.
+
+   #+begin_src sql
+   
+   #+end_src
+
+* Procedury modyfikujące dane
+
