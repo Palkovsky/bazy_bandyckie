@@ -1,15 +1,5 @@
-/* Cleanup for multiple runs */
-/*
-DROP VIEW wycieczki_osoby_potwierdzone;
-DROP VIEW wycieczki_przyszle;
-DROP VIEW wycieczki_osoby;
-DROP VIEW wycieczki_miejsca;
-DROP VIEW dostepne_wycieczki;
-DROP VIEW rezerwacje_do_anulowania;
-*/
-
 /* Zadanie 3a */
-CREATE VIEW wycieczki_osoby
+CREATE OR REPLACE VIEW wycieczki_osoby
  AS
     SELECT
         w.ID_WYCIECZKI,
@@ -27,7 +17,7 @@ CREATE VIEW wycieczki_osoby
         OSOBY o ON r.ID_OSOBY = o.ID_OSOBY;
 
 /* Zadanie 3b */
-CREATE VIEW wycieczki_osoby_potwierdzone
+CREATE OR REPLACE VIEW wycieczki_osoby_potwierdzone
  AS
     SELECT
         *
@@ -37,7 +27,7 @@ CREATE VIEW wycieczki_osoby_potwierdzone
           STATUS = 'Z';
 
 /* Zadanie 3c */
-CREATE VIEW wycieczki_przyszle
+CREATE OR REPLACE VIEW wycieczki_przyszle
  AS
     SELECT
         *
@@ -48,7 +38,7 @@ CREATE VIEW wycieczki_przyszle
 
 /* Zadanie 3d */
 /* Zakładamy, że anulowana rezerwacja to wolne miejsce. */
-CREATE VIEW wycieczki_miejsca
+CREATE OR REPLACE VIEW wycieczki_miejsca
  AS
     SELECT
         w.ID_WYCIECZKI,
@@ -67,7 +57,7 @@ CREATE VIEW wycieczki_miejsca
           w.ID_WYCIECZKI, w.NAZWA, w.KRAJ, w.DATA, w.LICZBA_MIEJSC;
 
 /* Zadanie 3e */
-CREATE VIEW dostepne_wycieczki
+CREATE OR REPLACE VIEW dostepne_wycieczki
  AS
     SELECT
            *
@@ -77,7 +67,7 @@ CREATE VIEW dostepne_wycieczki
         LICZBA_WOLNYCH_MIEJSC > 0 AND DATA > CURRENT_DATE;
 
 /* Zadanie  3f */
-CREATE VIEW rezerwacje_do_anulowania
+CREATE OR REPLACE VIEW rezerwacje_do_anulowania
 AS
 SELECT DISTINCT
 r.NR_REZERWACJI,

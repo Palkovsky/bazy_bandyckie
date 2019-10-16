@@ -5,7 +5,7 @@
 #+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
 
 * Schemat bazy
-   Kod użyty do wygenerowania schematu bazy danych został skopiowany z dokumentu z zadaniami.
+  Kod użyty do wygenerowania schematu bazy danych został skopiowany z dokumentu z zadaniami.
    #+begin_src sql
    CREATE TABLE OSOBY (
    ID_OSOBY INT GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -128,7 +128,7 @@ INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (1,3,'N');
 ** wycieczki​_osoby
    Widok łączy informacje o wycieczkach z uczestnikami na podstawie rezerwacji.
    #+begin_src sql
-   CREATE VIEW wycieczki_osoby
+   CREATE OR REPLACE VIEW wycieczki_osoby
    AS
     SELECT
         w.ID_WYCIECZKI,
@@ -150,7 +150,7 @@ INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (1,3,'N');
    Widok zwraca informacje o potwierdzonych uczestnikach, czyli tych którzy potwierdzili i zapłacili.
 
    #+begin_src sql
-CREATE VIEW wycieczki_osoby_potwierdzone
+CREATE OR REPLACE VIEW wycieczki_osoby_potwierdzone
  AS
     SELECT
         *
@@ -163,7 +163,7 @@ CREATE VIEW wycieczki_osoby_potwierdzone
 ** wycieczki​_przyszle
    Informacje o wycieczkach, które jeszcze się nie odbyły oraz ich uczestnikach.
    #+begin_src sql
-CREATE VIEW wycieczki_przyszle
+CREATE OR REPLACE VIEW wycieczki_przyszle
  AS
     SELECT
         *
@@ -176,7 +176,7 @@ CREATE VIEW wycieczki_przyszle
 ** wycieczki​_miejsca
    Zwraca informacje o zajętości miejsc poszczególnych wycieczek. Jeśli jakaś rezerwacja została anulowana, to uznajemy że miejsce jest wolne.
    #+begin_src sql
-CREATE VIEW wycieczki_miejsca
+CREATE OR REPLACE VIEW wycieczki_miejsca
  AS
     SELECT
         w.ID_WYCIECZKI,
@@ -198,7 +198,7 @@ CREATE VIEW wycieczki_miejsca
 ** dostepne​_wycieczki
    Zwraca informacje o wycieczkach, które jeszcze się nie odbyły i mają wolne miejsca.
    #+begin_src sql
-CREATE VIEW dostepne_wycieczki
+CREATE OR REPLACE VIEW dostepne_wycieczki
  AS
     SELECT
            *
@@ -211,7 +211,7 @@ CREATE VIEW dostepne_wycieczki
 ** rezerwacje​_do​_anulowania 
    Lista niepotwierdzonych rezerwacji które powinne zostać anulowane, rezerwacje przygotowywane są do anulowania na tydzień przed wyjazdem.
    #+begin_src sql
-CREATE VIEW rezerwacje_do_anulowania
+CREATE OR REPLACE VIEW rezerwacje_do_anulowania
   AS
     SELECT DISTINCT
         r.NR_REZERWACJI,
@@ -233,13 +233,193 @@ CREATE VIEW rezerwacje_do_anulowania
    #+end_src
 
 * Procedury pobierające dane
+  Procedury, które coś zwracają bez modyfikowania danych nazywamy ~funkcjami~. 
+  Ich zaletą jest możliwość używania ich w zapytaniach ~SQL~, w porównaniu do typowych procedur, które można używać tylko w ~PL/SQL~.
   
+  Ponieważ funkcje mogą zwracać tylko jedną wartość trzeba tworzyć specjalne typy tabel, które będą kolekcją zwracanych rekordów.
+  Pozwala to osiągnąć efekt podobny do tego co oferują widoki, ale wywoływanych jako funkcje z obsługą błędów.
+
 ** uczestnicy​_wycieczki(id​_wycieczki)
-   Procedura zwraca zestaw danych identyczny do tego z widoku ~wycieczki_osoby~.
+   Procedura zwraca zestaw danych podobnych do tego z widoku ~wycieczki_osoby~.
 
    #+begin_src sql
-   
+/* Pojedynczy rekord */
+CREATE OR REPLACE TYPE UCZESTNICY_WYCIECZKI_RECORD AS OBJECT (
+  ID_WYCIECZKI  NUMBER,
+  NAZWA         VARCHAR2(100),
+  KRAJ          VARCHAR2(50),
+  "DATA"        DATE,
+  IMIE          VARCHAR2(50),
+  NAZWISKO      VARCHAR(50),
+  STATUS        CHAR(1)
+);
+
+/* Kolekcja rekordów */
+CREATE OR REPLACE TYPE UCZESTNICY_WYCIECZKI_TABLE IS TABLE OF UCZESTNICY_WYCIECZKI_RECORD;
+
+CREATE OR REPLACE
+FUNCTION uczestnicy_wycieczki(id INT)
+    RETURN UCZESTNICY_WYCIECZKI_TABLE AS result UCZESTNICY_WYCIECZKI_TABLE;
+    record_count INT;
+    BEGIN
+        /* Upewnij się, że wycieczka istnieje */
+        SELECT COUNT(*) INTO record_count FROM WYCIECZKI WHERE ID_WYCIECZKI = id;
+        IF (record_count != 1) THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Record doest not exist.');
+        END IF;
+
+        /* Zbierz wynik do utworznej tabeli */
+        SELECT UCZESTNICY_WYCIECZKI_RECORD(
+            w.ID_WYCIECZKI, w.NAZWA, w.KRAJ, w.DATA, o.IMIE, o.NAZWISKO, r.STATUS)
+        BULK COLLECT INTO
+            result
+        FROM
+            WYCIECZKI w
+        JOIN
+            REZERWACJE r ON w.ID_WYCIECZKI = r.ID_WYCIECZKI
+        JOIN
+            OSOBY o ON r.ID_OSOBY = o.ID_OSOBY
+        WHERE
+            w.ID_WYCIECZKI = id AND r.STATUS != 'A';
+
+        /* Zwróć tabelę */
+        RETURN result;
+    END uczestnicy_wycieczki;
    #+end_src
 
+   Wyniki powyższej funkcji można teraz wykorzystywać w następujący sposób:
+   #+begin_src sql
+   SELECT * FROM TABLE(uczestnicy_wycieczki(1));
+   #+end_src
+
+** rezerwacje​_osoby(id​_osoby) 
+   Procedura zwraca podobny zestaw danych do tego z widoku ~wycieczki_osoby~.
+   #+begin_src sql
+CREATE OR REPLACE TYPE REZERWACJE_OSOBY_RECORD AS OBJECT (
+  ID_WYCIECZKI  NUMBER,
+  NAZWA         VARCHAR2(100),
+  KRAJ          VARCHAR2(50),
+  "DATA"        DATE,
+  IMIE          VARCHAR2(50),
+  NAZWISKO      VARCHAR(50),
+  STATUS        CHAR(1)
+);
+CREATE OR REPLACE TYPE REZERWACJE_OSOBY_TABLE IS TABLE OF REZERWACJE_OSOBY_RECORD;
+
+CREATE OR REPLACE
+FUNCTION rezerwacje_osoby(id INT)
+    RETURN REZERWACJE_OSOBY_TABLE AS result REZERWACJE_OSOBY_TABLE;
+    record_count INT;
+    BEGIN
+        /* Upewnij się, że osoba istnieje */
+        SELECT COUNT(*) INTO record_count FROM OSOBY WHERE ID_OSOBY = id;
+        IF (record_count != 1) THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Record doest not exist.');
+        END IF;
+
+        /* Zbierz wynik do utworznej tabeli */
+        SELECT REZERWACJE_OSOBY_RECORD(
+            w.ID_WYCIECZKI, w.NAZWA, w.KRAJ, w.DATA, o.IMIE, o.NAZWISKO, r.STATUS)
+        BULK COLLECT INTO
+            result
+        FROM
+            WYCIECZKI w
+        JOIN
+            REZERWACJE r ON w.ID_WYCIECZKI = r.ID_WYCIECZKI
+        JOIN
+            OSOBY o ON r.ID_OSOBY = o.ID_OSOBY
+        WHERE
+            o.ID_OSOBY = id AND r.STATUS != 'A';
+
+        /* Zwróć tabelę */
+        RETURN result;
+    END rezerwacje_osoby;
+   #+end_src
+
+** przyszle​_rezerwacje​_osoby(id​_osoby) 
+   Procedura zwracająca informacje o rezerwacjach danej osoby na wycieczki odbywające się w przyszłości.
+   #+begin_src sql
+CREATE OR REPLACE TYPE PRZYSZLE_REZERWACJE_OSOBY_RECORD AS OBJECT (
+  ID_WYCIECZKI  NUMBER,
+  NAZWA         VARCHAR2(100),
+  KRAJ          VARCHAR2(50),
+  "DATA"        DATE,
+  IMIE          VARCHAR2(50),
+  NAZWISKO      VARCHAR(50),
+  STATUS        CHAR(1)
+);
+CREATE OR REPLACE TYPE PRZYSZLE_REZERWACJE_OSOBY_TABLE IS TABLE OF PRZYSZLE_REZERWACJE_OSOBY_RECORD;
+
+CREATE OR REPLACE
+FUNCTION przyszle_rezerwacje_osoby(id INT)
+    RETURN PRZYSZLE_REZERWACJE_OSOBY_TABLE AS result PRZYSZLE_REZERWACJE_OSOBY_TABLE;
+    record_count INT;
+    BEGIN
+        /* Upewnij się, że osoba istnieje */
+        SELECT COUNT(*) INTO record_count FROM OSOBY WHERE ID_OSOBY = id;
+        IF (record_count != 1) THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Record doest not exist.');
+        END IF;
+
+        /* Zbierz wynik do utworznej tabeli */
+        SELECT PRZYSZLE_REZERWACJE_OSOBY_RECORD(
+            w.ID_WYCIECZKI, w.NAZWA, w.KRAJ, w.DATA, o.IMIE, o.NAZWISKO, r.STATUS)
+        BULK COLLECT INTO
+            result
+        FROM
+            WYCIECZKI w
+        JOIN
+            REZERWACJE r ON w.ID_WYCIECZKI = r.ID_WYCIECZKI
+        JOIN
+            OSOBY o ON r.ID_OSOBY = o.ID_OSOBY
+        WHERE
+            o.ID_OSOBY = id AND r.STATUS != 'A' AND w.DATA > CURRENT_DATE;
+
+        /* Zwróć tabelę */
+        RETURN result;
+    END przyszle_rezerwacje_osoby;
+   #+end_src
+
+** dostepne​_wycieczki(kraj, od, do)
+   Funkcja wykorzystuje wcześniej stworzony widok ~dostepne_wycieczki~, który zapewnia że są wolne miejsca oraz że wycieczka jeszcze się nie odbyła.
+   W procedurze sprawdzamy czy zakres dat jest poprawny.
+
+   #+begin_src sql
+CREATE OR REPLACE TYPE DOSTEPNE_WYCIECZKI_RECORD AS OBJECT (
+  ID_WYCIECZKI  NUMBER,
+  NAZWA         VARCHAR2(100),
+  KRAJ          VARCHAR2(50),
+  "DATA"        DATE,
+  WOLNE_MIEJSCA NUMBER
+);
+CREATE OR REPLACE TYPE DOSTEPNE_WYCIECZKI_TABLE IS TABLE OF DOSTEPNE_WYCIECZKI_RECORD;
+
+CREATE OR REPLACE
+    FUNCTION dostepne_wycieczki_func(kraj WYCIECZKI.KRAJ%TYPE, data_od DATE, data_do DATE)
+    RETURN DOSTEPNE_WYCIECZKI_TABLE AS result DOSTEPNE_WYCIECZKI_TABLE;
+    BEGIN
+        /* Upewnij się, że przedział dat jest okej */
+        IF data_do < data_od THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Invalid date range.');
+        END IF;
+
+        /* Zbierz wynik do utworznej tabeli.
+           Używamy widoku dostępne wycieczki, który bierze pod uwagę ilość miejsc. */
+        SELECT DOSTEPNE_WYCIECZKI_RECORD(
+            w.ID_WYCIECZKI, w.NAZWA, w.KRAJ, w.DATA, w.LICZBA_WOLNYCH_MIEJSC)
+        BULK COLLECT INTO
+            result
+        FROM
+            DOSTEPNE_WYCIECZKI w
+        WHERE
+             w.KRAJ = dostepne_wycieczki_func.kraj AND
+             w.DATA >= data_od AND
+             w.DATA <= data_do;
+
+        /* Zwróć tabelę */
+        RETURN result;
+    END dostepne_wycieczki_func;   
+   #+end_src
+  
 * Procedury modyfikujące dane
 
