@@ -1,9 +1,12 @@
 #+TITLE: Oracle PL/SQL - Sprawozdanie
 #+LANGUAGE: pl
 #+OPTIONS: date:nil
-#+LATEX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
 #+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
 
+#+LATEX: \usepackage{listings}
+
+#+LATEX: \newpage
 * Schemat bazy
   Kod użyty do wygenerowania schematu bazy danych został skopiowany z dokumentu z zadaniami.
    #+begin_src sql
@@ -50,6 +53,7 @@
    ENABLE;
    #+end_src
    
+#+LATEX: \newpage
 * Przykładowe dane
    Baza ma zawierać:
    - 4 wycieczki
@@ -122,6 +126,7 @@ INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (4,7,'N');
 INSERT INTO rezerwacje(id_wycieczki, id_osoby, status) VALUES (1,3,'N');
    #+end_src
 
+#+LATEX: \newpage
 * Widoki
   Tworzenie widoków. Należy przygotować kilka widoków ułatwiających dostęp do danych.
 
@@ -232,12 +237,13 @@ CREATE OR REPLACE VIEW rezerwacje_do_anulowania
         w.DATA - CURRENT_DATE <= 7 AND r.STATUS != 'Z';
    #+end_src
 
+#+LATEX: \newpage
 * Procedury pobierające dane
   Procedury, które coś zwracają bez modyfikowania danych nazywamy ~funkcjami~. 
   Ich zaletą jest możliwość używania ich w zapytaniach ~SQL~, w porównaniu do typowych procedur, które można używać tylko w ~PL/SQL~.
   
-  Ponieważ funkcje mogą zwracać tylko jedną wartość trzeba tworzyć specjalne typy tabel, które będą kolekcją zwracanych rekordów.
-  Pozwala to osiągnąć efekt podobny do tego co oferują widoki, ale wywoływanych jako funkcje z obsługą błędów.
+  Ponieważ funkcje mogą zwracać tylko jedną wartość trzeba tworzyć specjalne tabelearyczne typy, które będą kolekcją zwracanych rekordów.
+  Pozwala to osiągnąć efekt podobny do tego co oferują widoki, ale wywoływanye jako funkcje z obsługą błędów.
 
 ** uczestnicy​_wycieczki(id​_wycieczki)
    Procedura zwraca zestaw danych podobnych do tego z widoku ~wycieczki_osoby~.
@@ -348,7 +354,8 @@ CREATE OR REPLACE TYPE PRZYSZLE_REZERWACJE_OSOBY_RECORD AS OBJECT (
   NAZWISKO      VARCHAR(50),
   STATUS        CHAR(1)
 );
-CREATE OR REPLACE TYPE PRZYSZLE_REZERWACJE_OSOBY_TABLE IS TABLE OF PRZYSZLE_REZERWACJE_OSOBY_RECORD;
+CREATE OR REPLACE TYPE PRZYSZLE_REZERWACJE_OSOBY_TABLE 
+IS TABLE OF PRZYSZLE_REZERWACJE_OSOBY_RECORD;
 
 CREATE OR REPLACE
 FUNCTION przyszle_rezerwacje_osoby(id INT)
@@ -421,6 +428,7 @@ CREATE OR REPLACE
     END dostepne_wycieczki_func;   
    #+end_src
   
+#+LATEX: \newpage
 * Procedury modyfikujące dane
   Tworzenie procedur modyfikujących dane.
   Należy przygotować zestaw procedur pozwalających na modyfikację danych oraz kontrolę poprawności ich wprowadzania.
@@ -439,8 +447,11 @@ AS
   rezerwacje_count INT;
 BEGIN
   SELECT COUNT(*) INTO osoby_count FROM OSOBY WHERE ID_OSOBY = dodaj_rezerwacje.id_osoby;
-  SELECT COUNT(*) INTO wycieczki_count FROM DOSTEPNE_WYCIECZKI WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki;
-  SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki AND ID_OSOBY = dodaj_rezerwacje.id_osoby;
+  SELECT COUNT(*) INTO wycieczki_count FROM DOSTEPNE_WYCIECZKI 
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki;
+  SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE 
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki AND 
+          ID_OSOBY = dodaj_rezerwacje.id_osoby;
 
   IF (osoby_count != 1) THEN
       raise_application_error(-20000, 'Invalid person identifier.');
@@ -452,7 +463,8 @@ BEGIN
       raise_application_error(-20002, 'Booking already exists.');
   END IF;
 
-  INSERT INTO REZERWACJE(ID_WYCIECZKI, ID_OSOBY, STATUS) VALUES (id_wycieczki, id_osoby, 'N');
+  INSERT INTO REZERWACJE(ID_WYCIECZKI, ID_OSOBY, STATUS) 
+  VALUES (id_wycieczki, id_osoby, 'N');
 END dodaj_rezerwacje; 
    #+end_src
 
@@ -464,7 +476,8 @@ END dodaj_rezerwacje;
    - Czy nie zmieniamy stanu z 'Zapłacona i potwierdzona' na 'Potwierdzona'.  
    
    #+begin_src sql
-CREATE OR REPLACE PROCEDURE zmien_status_rezerwacji(id_rezerwacji NUMBER, nowy_status CHAR)
+CREATE OR REPLACE 
+PROCEDURE zmien_status_rezerwacji(id_rezerwacji NUMBER, nowy_status CHAR)
 AS
   id_wycieczki NUMBER;
   stary_status CHAR;
@@ -484,7 +497,8 @@ BEGIN
     WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
 
   /* Sprawdź czy wycieczka ma miejsce w przyszłości. Jeśli nie to błąd. */
-  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE 
+    WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
   IF counter = 0 THEN
     RAISE_APPLICATION_ERROR(-20001, 'Unable to change reservation status for past trip.');
   END IF;
@@ -499,11 +513,13 @@ BEGIN
     RAISE_APPLICATION_ERROR(-20003, 'The reservation is already paid.');
   END IF;
 
-  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. Jeśli nie ma: BŁAD */
+  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. */
   IF stary_status = 'A' THEN
-    SELECT COUNT(*) INTO counter FROM DOSTEPNE_WYCIECZKI WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+    SELECT COUNT(*) INTO counter FROM DOSTEPNE_WYCIECZKI 
+      WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
     IF counter = 0 THEN
-      RAISE_APPLICATION_ERROR(-20004, 'Unable to uncancel reservation. All free spots taken.');
+      RAISE_APPLICATION_ERROR(-20004, 
+        'Unable to uncancel reservation. All free spots taken.');
     END IF;
   END IF;
 
@@ -516,7 +532,8 @@ END zmien_status_rezerwacji;
 
 ** zmien​_liczbe​_miejsc(id​_wycieczki, liczba​_miejsc)
    #+begin_src sql
-   CREATE OR REPLACE PROCEDURE zmien_liczbe_miejsc(id_wycieczki NUMBER, nowa_liczba_miejsc NUMBER)
+CREATE OR REPLACE 
+PROCEDURE zmien_liczbe_miejsc(id_wycieczki NUMBER, nowa_liczba_miejsc NUMBER)
 AS
   zajeta_liczba_miejsc NUMBER;
   counter INT;
@@ -532,7 +549,7 @@ BEGIN
   SELECT LICZBA_MIEJSC - LICZBA_WOLNYCH_MIEJSC INTO zajeta_liczba_miejsc
     FROM WYCIECZKI_MIEJSCA WHERE ID_WYCIECZKI = zmien_liczbe_miejsc.id_wycieczki;
   /* Jeśli liczba miejsc ujemna lub mniejsza od ilości zarezerwowanych -> BŁĄD*/
-  IF nowa_liczba_miejsc < 0 OR zajeta_liczba_miejsc > nowa_liczba_miejsc THEN
+  IF zajeta_liczba_miejsc > nowa_liczba_miejsc THEN
     raise_application_error(-20001, 'Not enough spots.');
   END IF;
 
@@ -542,6 +559,7 @@ BEGIN
 END zmien_liczbe_miejsc;
    #+end_src
 
+#+LATEX: \newpage
 * Tabela dziennikująca  
   Dodajemy tabelę dziennikującą zmiany statusu rezerwacji ~rezerwacje_log(id, id_rezerwacji, data, status)~.
   Zmieniamy procedury modyfikujących dane tak aby dopisywały informację do dziennika.
@@ -574,7 +592,8 @@ BEGIN
   SELECT COUNT(*) INTO wycieczki_count FROM DOSTEPNE_WYCIECZKI 
     WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki;
   SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE 
-    WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki AND ID_OSOBY = dodaj_rezerwacje.id_osoby;
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki AND 
+          ID_OSOBY = dodaj_rezerwacje.id_osoby;
 
   IF (osoby_count != 1) THEN
       raise_application_error(-20000, 'Invalid person identifier.');
@@ -596,7 +615,8 @@ END dodaj_rezerwacje;
     #+end_src
 *** zmien​_status​_rezerwacji
     #+begin_src sql
-CREATE OR REPLACE PROCEDURE zmien_status_rezerwacji(id_rezerwacji NUMBER, nowy_status CHAR)
+CREATE OR REPLACE 
+PROCEDURE zmien_status_rezerwacji(id_rezerwacji NUMBER, nowy_status CHAR)
 AS
   id_wycieczki NUMBER;
   stary_status CHAR;
@@ -616,7 +636,8 @@ BEGIN
     WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
 
   /* Sprawdź czy wycieczka ma miejsce w przyszłości. Jeśli nie to błąd. */
-  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE 
+    WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
   IF counter = 0 THEN
     RAISE_APPLICATION_ERROR(-20001, 'Unable to change reservation status for past trip.');
   END IF;
@@ -631,11 +652,13 @@ BEGIN
     RAISE_APPLICATION_ERROR(-20003, 'The reservation is already paid.');
   END IF;
 
-  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. Jeśli nie ma: BŁAD */
+  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. */
   IF stary_status = 'A' THEN
-    SELECT COUNT(*) INTO counter FROM DOSTEPNE_WYCIECZKI WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+    SELECT COUNT(*) INTO counter FROM DOSTEPNE_WYCIECZKI 
+      WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
     IF counter = 0 THEN
-      RAISE_APPLICATION_ERROR(-20004, 'Unable to uncancel reservation. All free spots taken.');
+      RAISE_APPLICATION_ERROR(-20004, 
+        'Unable to uncancel reservation. All free spots taken.');
     END IF;
   END IF;
 
@@ -646,10 +669,15 @@ BEGIN
 
   /* TO SIĘ ZMIENIŁO */
   INSERT INTO REZERWACJE_LOG(ID_REZERWACJI, DATA, STATUS)
-  VALUES (zmien_status_rezerwacji.id_rezerwacji, CURRENT_DATE, zmien_status_rezerwacji.nowy_status);
+  VALUES (
+    zmien_status_rezerwacji.id_rezerwacji,
+    CURRENT_DATE,
+    zmien_status_rezerwacji.nowy_status
+);
 END zmien_status_rezerwacji;    
     #+end_src
     
+#+LATEX: \newpage
 * Redundante pole ~liczba​_wolnych​_miejsc~
   W tabeli wycieczki dodajemy redundantne pole ~liczba​_wolnych​_miejsc~.
   #+begin_src sql
@@ -692,7 +720,8 @@ CREATE OR REPLACE VIEW dostepne_wycieczki_2
 CREATE OR REPLACE PROCEDURE przelicz AS
   BEGIN
     UPDATE WYCIECZKI w SET LICZBA_WOLNYCH_MIEJSC = LICZBA_MIEJSC -
-      (SELECT COUNT(*) FROM REZERWACJE r WHERE r.ID_WYCIECZKI = w.ID_WYCIECZKI AND r.STATUS != 'A');
+      (SELECT COUNT(*) FROM REZERWACJE r 
+        WHERE r.ID_WYCIECZKI = w.ID_WYCIECZKI AND r.STATUS != 'A');
   END;   
    #+end_src
 
@@ -748,7 +777,8 @@ BEGIN
   SELECT COUNT(*) INTO wycieczki_count FROM WYCIECZKI
     WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki AND DATA > CURRENT_DATE;
   SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE 
-    WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki AND ID_OSOBY = dodaj_rezerwacje_2.id_osoby;
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki AND 
+          ID_OSOBY = dodaj_rezerwacje_2.id_osoby;
   SELECT LICZBA_WOLNYCH_MIEJSC INTO wolne_miejsca FROM WYCIECZKI 
     WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki;
 
@@ -776,7 +806,8 @@ END dodaj_rezerwacje_2;
     #+end_src
 *** zmien​_status​_rezerwacji​_2
     #+begin_src sql
-CREATE OR REPLACE PROCEDURE zmien_status_rezerwacji_2(id_rezerwacji NUMBER, nowy_status CHAR)
+CREATE OR REPLACE 
+PROCEDURE zmien_status_rezerwacji_2(id_rezerwacji NUMBER, nowy_status CHAR)
 AS
   id_wycieczki NUMBER;
   stary_status CHAR;
@@ -813,12 +844,13 @@ BEGIN
     RAISE_APPLICATION_ERROR(-20003, 'The reservation is already paid.');
   END IF;
 
-  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. Jeśli nie ma: BŁAD */
+  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. */
   IF stary_status = 'A' THEN
     SELECT LICZBA_WOLNYCH_MIEJSC INTO counter FROM WYCIECZKI 
       WHERE ID_WYCIECZKI = zmien_status_rezerwacji_2.id_wycieczki;
     IF counter = 0 THEN
-      RAISE_APPLICATION_ERROR(-20004, 'Unable to uncancel reservation. All free spots taken.');
+      RAISE_APPLICATION_ERROR(-20004, 
+        'Unable to uncancel reservation. All free spots taken.');
     END IF;
   END IF;
 
@@ -848,7 +880,8 @@ END zmien_status_rezerwacji_2;
     #+end_src
 *** zmien​_liczbe​_miejsc​_2
     #+begin_src sql
-CREATE OR REPLACE PROCEDURE zmien_liczbe_miejsc_2(id_wycieczki NUMBER, nowa_liczba_miejsc NUMBER)
+CREATE OR REPLACE 
+PROCEDURE zmien_liczbe_miejsc_2(id_wycieczki NUMBER, nowa_liczba_miejsc NUMBER)
 AS
   zajeta_liczba_miejsc NUMBER;
   counter INT;
@@ -877,42 +910,142 @@ BEGIN
 END zmien_liczbe_miejsc_2; 
     #+end_src
 
+#+LATEX: \newpage
 * Dziennikowanie przy pomocy triggerów
   Należy wprowadzić zmianę która spowoduje że zapis do dziennika rezerwacji będzie realizowany przy pomocy triggerów.
 ** Dodanie rezerwacji
    Trigger obsługujący dodanie rezerwacji.
    #+begin_src sql
-   
+CREATE OR REPLACE TRIGGER NOWA_REZERWACJA_DZIENNIK_TRIG
+    AFTER INSERT
+    ON REZERWACJE
+    FOR EACH ROW
+    BEGIN
+        INSERT INTO REZERWACJE_LOG (ID_REZERWACJI, DATA, STATUS)
+            VALUES(:NEW.NR_REZERWACJI, CURRENT_DATE, :NEW.STATUS);
+    END NOWA_REZERWACJA_DZIENNIK_TRIG;   
    #+end_src
 
 ** Zmiana statusu
    Trigger obsługujący zmianę statusu.
    #+begin_src sql
-   
+CREATE OR REPLACE TRIGGER ZMIANA_STATUSU_DZIENNIK_TRIG
+    AFTER UPDATE OF STATUS
+    ON REZERWACJE
+    FOR EACH ROW
+    BEGIN
+        INSERT INTO REZERWACJE_LOG (ID_REZERWACJI, DATA, STATUS)
+            VALUES(:NEW.NR_REZERWACJI, CURRENT_DATE, :NEW.STATUS);
+    END ZMIANA_STATUSU_DZIENNIK_TRIG;   
    #+end_src
 
 ** Usuwanie
    Trigger zabraniający usunięcia rezerwacji.
    #+begin_src sql
-   
+CREATE OR REPLACE TRIGGER USUWANIE_REZERWACJI_TRIG
+    BEFORE DELETE
+    ON REZERWACJE
+    FOR EACH ROW
+    BEGIN
+        RAISE_APPLICATION_ERROR(-20000, 'Booking removal is disallowed.');
+    END;   
    #+end_src
 
+#+LATEX: \newpage
 * Obsługa redundantego pola ~liczba​_wolnych​_miejsc~ przy pomocy tiggerów
   Zmiana strategii obsługi redundantnego pola ~liczba​_wolnych​_miejsc~. Realizacja przy pomocy triggerów.
 ** Dodanie rezerwacji
    Trigger obsługujący dodanie rezerwacji.
    #+begin_src sql
-   
+CREATE OR REPLACE TRIGGER NOWA_REZERWACJA_WOLNE_MIEJSCA_TRIG
+BEFORE INSERT
+ON REZERWACJE
+FOR EACH ROW
+DECLARE
+    counter INT;
+BEGIN
+    /* Przed wstawieniem upuewnij się, że wolnie miejsce istnieje. */
+    SELECT LICZBA_WOLNYCH_MIEJSC INTO counter FROM WYCIECZKI
+        WHERE WYCIECZKI.ID_WYCIECZKI = :NEW.ID_WYCIECZKI;
+    IF counter = 0 THEN
+        RAISE_APPLICATION_ERROR(-20000, 'Not enough free spots.');
+    END IF;
+
+    /* Zmniejsz liczbę wolnych miejsc o 1 */
+    UPDATE WYCIECZKI SET LICZBA_WOLNYCH_MIEJSC = LICZBA_WOLNYCH_MIEJSC-1
+        WHERE ID_WYCIECZKI = :NEW.ID_WYCIECZKI;
+END NOWA_REZERWACJA_WOLNE_MIEJSCA_TRIG;   
    #+end_src
 
 ** Zmiana statusu
    Trigger obsługujący zmianę statusu na anulowany lub z anulowanego.
    #+begin_src sql
-   
+CREATE OR REPLACE TRIGGER ZMIANA_STATUSU_WOLNE_MIEJSCA_TRIG
+BEFORE UPDATE OF STATUS
+ON REZERWACJE
+FOR EACH ROW
+DECLARE
+    counter INT;
+    update_by INT;
+BEGIN
+    SELECT LICZBA_WOLNYCH_MIEJSC INTO counter
+        FROM WYCIECZKI WHERE ID_WYCIECZKI = :NEW.ID_WYCIECZKI;
+
+    /* Jeżeli zmieniamy stan z anulowanej na nieanulowaną, ale miejsc brak to błąd.*/
+    IF :OLD.STATUS = 'A' AND :NEW.STATUS != 'A' AND counter = 0 THEN
+        RAISE_APPLICATION_ERROR(-20000, 'Not enough free spots.');
+    END IF;
+
+    /* Policz ile trzeba dodać do pola wolnych miejsc */
+    update_by := 0;
+    IF :OLD.STATUS = 'A' AND :NEW.STATUS != 'A' THEN
+        update_by := -1; /* Odnowiona rezerwacja */
+    END IF;
+    IF :OLD.STATUS != 'A' AND :NEW.STATUS = 'A' THEN
+        update_by := 1; /* Anulowanie rezerwacji */
+    END IF;
+
+    UPDATE WYCIECZKI SET
+        LICZBA_WOLNYCH_MIEJSC = LICZBA_WOLNYCH_MIEJSC+update_by
+    WHERE
+        ID_WYCIECZKI = :NEW.ID_WYCIECZKI;
+END ZMIANA_STATUSU_WOLNE_MIEJSCA_TRIG;   
    #+end_src
 
 ** Update wycieczki
    Trigger obsługujący zmianę liczby miejsc na poziomie wycieczki.
    #+begin_src sql
-   
+CREATE OR REPLACE TRIGGER ZMIANA_MIEJSC_WYCIECZKI_TRIG
+BEFORE UPDATE OF LICZBA_MIEJSC
+ON WYCIECZKI
+FOR EACH ROW
+DECLARE
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    zajete_miejsca INT;
+BEGIN
+    /* Policz ile miejsc zajętych */
+    SELECT (LICZBA_MIEJSC-LICZBA_WOLNYCH_MIEJSC) INTO zajete_miejsca FROM WYCIECZKI
+        WHERE ID_WYCIECZKI = :NEW.ID_WYCIECZKI;
+
+    /* Sprawdź czy nowa liczba miejsc nie jest mniejsza od liczby już zajętych. */
+    IF :NEW.LICZBA_MIEJSC < zajete_miejsca THEN
+        RAISE_APPLICATION_ERROR(-20000, 'Spots count too low.');
+    END IF;
+
+    /* Przelicz liczbę miejsc */
+    SELECT (:NEW.LICZBA_MIEJSC - zajete_miejsca)
+        INTO :NEW.LICZBA_WOLNYCH_MIEJSC
+        FROM DUAL;
+END ZMIANA_MIEJSC_WYCIECZKI_TRIG; 
    #+end_src
+
+#+LATEX: \newpage
+* Procedury współdziałające z triggerami
+  Modyfikacja będzie polegała na usunięciu fragmentów obsługujących redundante pole i wpisujące dane do dziennika.
+  Procedury te będę identyczne do tych, co w rozdziale ~Procedury modyfikujące dane~. 
+  Jedyną różnicą będzie sufiks ~_3~ oraz wykorzystanie widoków używających redundantego pola zamiast widoków obliczających wolne miejsca dynamicznie.
+
+
+
+
+
