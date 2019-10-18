@@ -422,4 +422,497 @@ CREATE OR REPLACE
    #+end_src
   
 * Procedury modyfikujące dane
+  Tworzenie procedur modyfikujących dane.
+  Należy przygotować zestaw procedur pozwalających na modyfikację danych oraz kontrolę poprawności ich wprowadzania.
+  Należy rozważyć użycie transakcji.
+  Należy zwrócić uwagę na kontrolę parametrów (np. jeśli parametrem jest id​_wycieczki to należy sprawdzić czy taka wycieczka istnieje, jeśli robimy rezerwację to należy sprawdzać czy są wolne miejsca).
+** dodaj​_rezerwacje(id​_wycieczki, id​_osoby)
+    Procedura kontroluje czy wycieczka jeszcze się nie odbyła, i czy sa wolne miejsca. Używa do tego celu wcześniej stworzonego widoku ~dostepne​_wycieczki~. 
+    Musimy walidować jedynie:
+    - poprawność id​_wycieczki i id​_osoby
+    - czy dana osoba nie złożyła wcześniej rezerwacji na daną wycieczkę
+   #+begin_src sql
+CREATE OR REPLACE PROCEDURE dodaj_rezerwacje(id_wycieczki NUMBER, id_osoby NUMBER)
+AS
+  osoby_count INT;
+  wycieczki_count INT;
+  rezerwacje_count INT;
+BEGIN
+  SELECT COUNT(*) INTO osoby_count FROM OSOBY WHERE ID_OSOBY = dodaj_rezerwacje.id_osoby;
+  SELECT COUNT(*) INTO wycieczki_count FROM DOSTEPNE_WYCIECZKI WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki;
+  SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki AND ID_OSOBY = dodaj_rezerwacje.id_osoby;
 
+  IF (osoby_count != 1) THEN
+      raise_application_error(-20000, 'Invalid person identifier.');
+  END IF;
+  IF (wycieczki_count != 1) THEN
+      raise_application_error(-20001, 'Invalid trip identifier.');
+  END IF;
+  IF (rezerwacje_count != 0) THEN
+      raise_application_error(-20002, 'Booking already exists.');
+  END IF;
+
+  INSERT INTO REZERWACJE(ID_WYCIECZKI, ID_OSOBY, STATUS) VALUES (id_wycieczki, id_osoby, 'N');
+END dodaj_rezerwacje; 
+   #+end_src
+
+** zmien​_status​_rezerwacji(id​_rezerwacji, status)
+   Procedura sprawdza:
+   - Czy wycieczka już się odbyła, ponieważ nie można zmieniać rezerwacji dla wycieczek z przeszłości.
+   - Czy przywrócenie anulowanej rezerwacji jest możliwe - muszą być wolne miejsca.
+   - Czy nie ustawiamy rezerwacji stanu 'Nowa', ponieważ ten stan jest zarezerwowany tylko dla świeżo dodanych rezerwacji.
+   - Czy nie zmieniamy stanu z 'Zapłacona i potwierdzona' na 'Potwierdzona'.  
+   
+   #+begin_src sql
+CREATE OR REPLACE PROCEDURE zmien_status_rezerwacji(id_rezerwacji NUMBER, nowy_status CHAR)
+AS
+  id_wycieczki NUMBER;
+  stary_status CHAR;
+  counter INT;
+BEGIN
+  /* Czy rezerwacja istnieje */
+  SELECT COUNT(*) INTO counter FROM REZERWACJE 
+  WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+  IF counter != 1 THEN
+    RAISE_APPLICATION_ERROR(-20000, 'Invalid booking identifier.');
+  END IF;
+
+  /* Pobierz informacje o starym statusie oraz identyfikatorze wyczieczki */
+  SELECT STATUS INTO stary_status FROM REZERWACJE 
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+  SELECT ID_WYCIECZKI INTO id_wycieczki FROM REZERWACJE 
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+
+  /* Sprawdź czy wycieczka ma miejsce w przyszłości. Jeśli nie to błąd. */
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+  IF counter = 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Unable to change reservation status for past trip.');
+  END IF;
+
+  /* Sprawdź czy nowy_status == 'N'. Jeśli tak to błąd. */
+  IF zmien_status_rezerwacji.nowy_status = 'N' THEN
+    RAISE_APPLICATION_ERROR(-20002, 'nowy_status must not be N');
+  END IF;
+
+  /* Zmiana z opłaconej i potwierdzonej na samą potwierdzoną nie ma sensu */
+  IF nowy_status = 'P' AND stary_status = 'Z' THEN
+    RAISE_APPLICATION_ERROR(-20003, 'The reservation is already paid.');
+  END IF;
+
+  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. Jeśli nie ma: BŁAD */
+  IF stary_status = 'A' THEN
+    SELECT COUNT(*) INTO counter FROM DOSTEPNE_WYCIECZKI WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+    IF counter = 0 THEN
+      RAISE_APPLICATION_ERROR(-20004, 'Unable to uncancel reservation. All free spots taken.');
+    END IF;
+  END IF;
+
+  /* W końcu updatuj */
+  UPDATE REZERWACJE
+    SET STATUS=zmien_status_rezerwacji.nowy_status 
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+END zmien_status_rezerwacji; 
+   #+end_src
+
+** zmien​_liczbe​_miejsc(id​_wycieczki, liczba​_miejsc)
+   #+begin_src sql
+   CREATE OR REPLACE PROCEDURE zmien_liczbe_miejsc(id_wycieczki NUMBER, nowa_liczba_miejsc NUMBER)
+AS
+  zajeta_liczba_miejsc NUMBER;
+  counter INT;
+BEGIN
+  /* Sprawdź czy wycieczka istnieje */
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI
+    WHERE ID_WYCIECZKI = zmien_liczbe_miejsc.id_wycieczki AND DATA > CURRENT_DATE;
+  IF counter != 1 THEN
+    RAISE_APPLICATION_ERROR(-20000, 'Invalid trip identifier.');
+  END IF;
+
+  /* Policz ile miejsc zajętych */
+  SELECT LICZBA_MIEJSC - LICZBA_WOLNYCH_MIEJSC INTO zajeta_liczba_miejsc
+    FROM WYCIECZKI_MIEJSCA WHERE ID_WYCIECZKI = zmien_liczbe_miejsc.id_wycieczki;
+  /* Jeśli liczba miejsc ujemna lub mniejsza od ilości zarezerwowanych -> BŁĄD*/
+  IF nowa_liczba_miejsc < 0 OR zajeta_liczba_miejsc > nowa_liczba_miejsc THEN
+    raise_application_error(-20001, 'Not enough spots.');
+  END IF;
+
+  /* Updatuj */
+  UPDATE WYCIECZKI SET LICZBA_MIEJSC=zmien_liczbe_miejsc.nowa_liczba_miejsc
+    WHERE ID_WYCIECZKI=zmien_liczbe_miejsc.id_wycieczki;
+END zmien_liczbe_miejsc;
+   #+end_src
+
+* Tabela dziennikująca  
+  Dodajemy tabelę dziennikującą zmiany statusu rezerwacji ~rezerwacje_log(id, id_rezerwacji, data, status)~.
+  Zmieniamy procedury modyfikujących dane tak aby dopisywały informację do dziennika.
+  Pola ~ID​_REZERWACJI~ nie traktujemy jako klucza obcego, aby po usunięciu rezerwacji nie tracić informacji w logach.
+
+   #+begin_src sql
+CREATE TABLE REZERWACJE_LOG (
+   REZERWACJE_LOG_ID INT GENERATED ALWAYS AS IDENTITY NOT NULL,
+   ID_REZERWACJI INT,
+   DATA DATE,
+   STATUS CHAR(1),
+   CONSTRAINT REZERWACJE_LOG_PK PRIMARY KEY (REZERWACJE_LOG_ID) ENABLE
+); 
+ENABLE;
+   #+end_src
+** Modyfikacja procedur
+   Modyfikacja polega na dodaniu odpowiedniego wpisu do ~rezerwacje​_log~. 
+   Modyfikacji podlegają jedynie procedury ~dodaj​_rezerwacje~ i ~zmien​_status​_rezerwacji~, bo tylko one edytują ~rezerwacje~.
+   
+*** dodaj​_rezerwacje
+    #+begin_src sql
+CREATE OR REPLACE PROCEDURE dodaj_rezerwacje(id_wycieczki NUMBER, id_osoby NUMBER)
+AS
+  osoby_count INT;
+  wycieczki_count INT;
+  rezerwacje_count INT;
+  id_nowej_rezerwacji INT;
+BEGIN
+  SELECT COUNT(*) INTO osoby_count FROM OSOBY WHERE ID_OSOBY = dodaj_rezerwacje.id_osoby;
+  SELECT COUNT(*) INTO wycieczki_count FROM DOSTEPNE_WYCIECZKI 
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki;
+  SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE 
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje.id_wycieczki AND ID_OSOBY = dodaj_rezerwacje.id_osoby;
+
+  IF (osoby_count != 1) THEN
+      raise_application_error(-20000, 'Invalid person identifier.');
+  END IF;
+  IF (wycieczki_count != 1) THEN
+      raise_application_error(-20001, 'Invalid trip identifier.');
+  END IF;
+  IF (rezerwacje_count != 0) THEN
+      raise_application_error(-20002, 'Booking already exists.');
+  END IF;
+  
+  /* To się zmieniło */
+  INSERT INTO REZERWACJE(ID_WYCIECZKI, ID_OSOBY, STATUS) 
+    VALUES (id_wycieczki, id_osoby, 'N')
+    RETURNING NR_REZERWACJI INTO id_nowej_rezerwacji;
+  INSERT INTO REZERWACJE_LOG(ID_REZERWACJI, DATA, STATUS) 
+    VALUES(id_nowej_rezerwacji, CURRENT_DATE, 'N');
+END dodaj_rezerwacje;  
+    #+end_src
+*** zmien​_status​_rezerwacji
+    #+begin_src sql
+CREATE OR REPLACE PROCEDURE zmien_status_rezerwacji(id_rezerwacji NUMBER, nowy_status CHAR)
+AS
+  id_wycieczki NUMBER;
+  stary_status CHAR;
+  counter INT;
+BEGIN
+  /* Czy rezerwacja istnieje */
+  SELECT COUNT(*) INTO counter FROM REZERWACJE
+  WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+  IF counter != 1 THEN
+    RAISE_APPLICATION_ERROR(-20000, 'Invalid booking identifier.');
+  END IF;
+
+  /* Pobierz informacje o starym statusie oraz identyfikatorze wyczieczki */
+  SELECT STATUS INTO stary_status FROM REZERWACJE
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+  SELECT ID_WYCIECZKI INTO id_wycieczki FROM REZERWACJE
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+
+  /* Sprawdź czy wycieczka ma miejsce w przyszłości. Jeśli nie to błąd. */
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+  IF counter = 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Unable to change reservation status for past trip.');
+  END IF;
+
+  /* Sprawdź czy nowy_status == 'N'. Jeśli tak to błąd. */
+  IF zmien_status_rezerwacji.nowy_status = 'N' THEN
+    RAISE_APPLICATION_ERROR(-20002, 'nowy_status must not be N');
+  END IF;
+
+  /* Zmiana z opłaconej i potwierdzonej na samą potwierdzoną nie ma sensu */
+  IF nowy_status = 'P' AND stary_status = 'Z' THEN
+    RAISE_APPLICATION_ERROR(-20003, 'The reservation is already paid.');
+  END IF;
+
+  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. Jeśli nie ma: BŁAD */
+  IF stary_status = 'A' THEN
+    SELECT COUNT(*) INTO counter FROM DOSTEPNE_WYCIECZKI WHERE ID_WYCIECZKI = zmien_status_rezerwacji.id_wycieczki;
+    IF counter = 0 THEN
+      RAISE_APPLICATION_ERROR(-20004, 'Unable to uncancel reservation. All free spots taken.');
+    END IF;
+  END IF;
+
+  /* W końcu updatuj */
+  UPDATE REZERWACJE
+    SET STATUS=zmien_status_rezerwacji.nowy_status
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji.id_rezerwacji;
+
+  /* TO SIĘ ZMIENIŁO */
+  INSERT INTO REZERWACJE_LOG(ID_REZERWACJI, DATA, STATUS)
+  VALUES (zmien_status_rezerwacji.id_rezerwacji, CURRENT_DATE, zmien_status_rezerwacji.nowy_status);
+END zmien_status_rezerwacji;    
+    #+end_src
+    
+* Redundante pole ~liczba​_wolnych​_miejsc~
+  W tabeli wycieczki dodajemy redundantne pole ~liczba​_wolnych​_miejsc~.
+  #+begin_src sql
+ALTER TABLE WYCIECZKI
+  ADD LICZBA_WOLNYCH_MIEJSC INTEGER DEFAULT 0 NOT NULL;
+  #+end_src
+
+** Modyfikacja widoków
+   Należy zmodyfikować zestaw widoków, które pobierają informację o wolnych miejscach z nowo dodanego pola.
+   Zmiana będzie dotyczyć widoków ~wycieczki​_miejsca~ i ~dostepne​_wycieczki~, bo tylko one korzystają z informacji o wolnych miejscach.
+*** wycieczki​_miejsca​_2
+    #+begin_src sql
+CREATE OR REPLACE VIEW wycieczki_miejsca_2
+ AS
+    SELECT
+        w.ID_WYCIECZKI,
+        w.NAZWA,
+        w.KRAJ,
+        w.DATA,
+        w.LICZBA_MIEJSC,
+        w.LICZBA_WOLNYCH_MIEJSC
+ FROM
+      WYCIECZKI w;    
+    #+end_src
+*** dostepne​_wycieczki​_2
+    #+begin_src sql
+CREATE OR REPLACE VIEW dostepne_wycieczki_2
+ AS
+    SELECT
+           *
+    FROM
+        wycieczki_miejsca_2
+    WHERE
+        LICZBA_WOLNYCH_MIEJSC > 0 AND DATA > CURRENT_DATE;    
+    #+end_src
+
+** Procedura ~przelicz~
+   Należy napisać procedurę przelicz która zaktualizuje wartość liczby wolnych miejsc dla już istniejących danych.
+   #+begin_src sql
+CREATE OR REPLACE PROCEDURE przelicz AS
+  BEGIN
+    UPDATE WYCIECZKI w SET LICZBA_WOLNYCH_MIEJSC = LICZBA_MIEJSC -
+      (SELECT COUNT(*) FROM REZERWACJE r WHERE r.ID_WYCIECZKI = w.ID_WYCIECZKI AND r.STATUS != 'A');
+  END;   
+   #+end_src
+
+** Modyfikacja procedur pobierających dane
+   Należy zmodyfikować warstwę procedur pobierających dane, podobnie jak w przypadku widoków.
+   Jedyną funkcją używającą nowego pola jest ~dostepne​_wycieczki​_func~.
+*** dostepne​_wycieczki​_2
+    #+begin_src sql
+CREATE OR REPLACE
+    FUNCTION dostepne_wycieczki_func_2(kraj WYCIECZKI.KRAJ%TYPE, data_od DATE, data_do DATE)
+    RETURN DOSTEPNE_WYCIECZKI_TABLE AS result DOSTEPNE_WYCIECZKI_TABLE;
+    BEGIN
+        /* Upewnij się, że przedział dat jest okej */
+        IF data_do < data_od THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Invalid date range.');
+        END IF;
+
+        /* Zbierz wynik do utworznej tabeli.
+           Używamy widoku dostępne wycieczki, który bierze pod uwagę ilość miejsc. */
+        SELECT DOSTEPNE_WYCIECZKI_RECORD(
+            ID_WYCIECZKI, NAZWA, KRAJ, DATA, LICZBA_WOLNYCH_MIEJSC)
+        BULK COLLECT INTO
+            result
+        FROM
+            WYCIECZKI
+        WHERE
+             KRAJ = dostepne_wycieczki_func_2.kraj AND
+             LICZBA_WOLNYCH_MIEJSC > 0 AND
+             DATA > CURRENT_DATE AND
+             DATA >= data_od AND
+             DATA <= data_do;
+
+        /* Zwróć tabelę */
+        RETURN result;
+    END dostepne_wycieczki_func_2;    
+    #+end_src
+
+** Modyfikacja procedur modyfikujących dane
+   Należy zmodyfikować procedury wprowadzające dane tak aby korzystały/aktualizowały pole ~liczba​_wolnych​_miejsc~ w tabeli wycieczki
+   Najlepiej to zrobić tworząc nowe wersje (np. z sufiksem 2).
+*** dodaj​_rezerwacje​_2
+    #+begin_src sql
+CREATE OR REPLACE PROCEDURE dodaj_rezerwacje_2(id_wycieczki NUMBER, id_osoby NUMBER)
+AS
+  osoby_count INT;
+  wycieczki_count INT;
+  wolne_miejsca INT;
+  rezerwacje_count INT;
+  id_nowej_rezerwacji INT;
+BEGIN
+  SELECT COUNT(*) INTO osoby_count FROM OSOBY 
+    WHERE ID_OSOBY = dodaj_rezerwacje_2.id_osoby;
+  SELECT COUNT(*) INTO wycieczki_count FROM WYCIECZKI
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki AND DATA > CURRENT_DATE;
+  SELECT COUNT(*) INTO rezerwacje_count FROM REZERWACJE 
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki AND ID_OSOBY = dodaj_rezerwacje_2.id_osoby;
+  SELECT LICZBA_WOLNYCH_MIEJSC INTO wolne_miejsca FROM WYCIECZKI 
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki;
+
+  IF (osoby_count != 1) THEN
+      raise_application_error(-20000, 'Invalid person identifier.');
+  END IF;
+  IF (wycieczki_count != 1) THEN
+      raise_application_error(-20001, 'Invalid trip identifier.');
+  END IF;
+  IF (rezerwacje_count != 0) THEN
+      raise_application_error(-20002, 'Booking already exists.');
+  END IF;
+  IF (wolne_miejsca = 0) THEN
+    raise_application_error(-20003, 'No free spots available.');
+  END IF;
+
+  INSERT INTO REZERWACJE(ID_WYCIECZKI, ID_OSOBY, STATUS)
+    VALUES (id_wycieczki, id_osoby, 'N')
+    RETURNING NR_REZERWACJI INTO id_nowej_rezerwacji;
+  UPDATE WYCIECZKI SET LICZBA_WOLNYCH_MIEJSC = wolne_miejsca-1
+    WHERE ID_WYCIECZKI = dodaj_rezerwacje_2.id_wycieczki;
+   INSERT INTO REZERWACJE_LOG(ID_REZERWACJI, DATA, STATUS)
+    VALUES(id_nowej_rezerwacji, CURRENT_DATE, 'N');
+END dodaj_rezerwacje_2;
+    #+end_src
+*** zmien​_status​_rezerwacji​_2
+    #+begin_src sql
+CREATE OR REPLACE PROCEDURE zmien_status_rezerwacji_2(id_rezerwacji NUMBER, nowy_status CHAR)
+AS
+  id_wycieczki NUMBER;
+  stary_status CHAR;
+  counter INT;
+  wolne_miejsca_change INT;
+BEGIN
+  /* Czy rezerwacja istnieje */
+  SELECT COUNT(*) INTO counter FROM REZERWACJE
+  WHERE NR_REZERWACJI = zmien_status_rezerwacji_2.id_rezerwacji;
+  IF counter != 1 THEN
+    RAISE_APPLICATION_ERROR(-20000, 'Invalid booking identifier.');
+  END IF;
+
+  /* Pobierz informacje o starym statusie oraz identyfikatorze wyczieczki */
+  SELECT STATUS INTO stary_status FROM REZERWACJE
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji_2.id_rezerwacji;
+  SELECT ID_WYCIECZKI INTO id_wycieczki FROM REZERWACJE
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji_2.id_rezerwacji;
+
+  /* Sprawdź czy wycieczka ma miejsce w przyszłości. Jeśli nie to błąd. */
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI_PRZYSZLE 
+    WHERE ID_WYCIECZKI = zmien_status_rezerwacji_2.id_wycieczki;
+  IF counter = 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Unable to change reservation status for past trip.');
+  END IF;
+
+  /* Sprawdź czy nowy_status == 'N'. Jeśli tak to błąd. */
+  IF zmien_status_rezerwacji_2.nowy_status = 'N' THEN
+    RAISE_APPLICATION_ERROR(-20002, 'nowy_status must not be N');
+  END IF;
+
+  /* Zmiana z opłaconej i potwierdzonej na samą potwierdzoną nie ma sensu */
+  IF nowy_status = 'P' AND stary_status = 'Z' THEN
+    RAISE_APPLICATION_ERROR(-20003, 'The reservation is already paid.');
+  END IF;
+
+  /* Sprawdź czy stary_status=A. Jeśli tak to sprawdź czy są wolne miejsca. Jeśli nie ma: BŁAD */
+  IF stary_status = 'A' THEN
+    SELECT LICZBA_WOLNYCH_MIEJSC INTO counter FROM WYCIECZKI 
+      WHERE ID_WYCIECZKI = zmien_status_rezerwacji_2.id_wycieczki;
+    IF counter = 0 THEN
+      RAISE_APPLICATION_ERROR(-20004, 'Unable to uncancel reservation. All free spots taken.');
+    END IF;
+  END IF;
+
+  /* W końcu updatuj */
+  UPDATE REZERWACJE
+    SET STATUS=zmien_status_rezerwacji_2.nowy_status
+    WHERE NR_REZERWACJI = zmien_status_rezerwacji_2.id_rezerwacji;
+
+  /* Zmodyfikuj liczbę wolnych miejsc */
+  wolne_miejsca_change := 0;
+  IF stary_status = 'A' AND zmien_status_rezerwacji_2.nowy_status != 'A' THEN
+    wolne_miejsca_change := -1;
+  END IF;
+  IF stary_status != 'A' AND zmien_status_rezerwacji_2.nowy_status = 'A' THEN
+    wolne_miejsca_change := 1;
+  END IF;
+  UPDATE WYCIECZKI SET LICZBA_WOLNYCH_MIEJSC = LICZBA_WOLNYCH_MIEJSC+ wolne_miejsca_change
+    WHERE ID_WYCIECZKI = zmien_status_rezerwacji_2.id_wycieczki;
+
+  INSERT INTO REZERWACJE_LOG(ID_REZERWACJI, DATA, STATUS)
+  VALUES (
+    zmien_status_rezerwacji_2.id_rezerwacji, 
+    CURRENT_DATE,
+    zmien_status_rezerwacji_2.nowy_status
+);
+END zmien_status_rezerwacji_2;    
+    #+end_src
+*** zmien​_liczbe​_miejsc​_2
+    #+begin_src sql
+CREATE OR REPLACE PROCEDURE zmien_liczbe_miejsc_2(id_wycieczki NUMBER, nowa_liczba_miejsc NUMBER)
+AS
+  zajeta_liczba_miejsc NUMBER;
+  counter INT;
+BEGIN
+  /* Sprawdź czy wycieczka istnieje */
+  SELECT COUNT(*) INTO counter FROM WYCIECZKI
+    WHERE ID_WYCIECZKI = zmien_liczbe_miejsc_2.id_wycieczki AND DATA > CURRENT_DATE;
+  IF counter != 1 THEN
+    RAISE_APPLICATION_ERROR(-20000, 'Invalid trip identifier.');
+  END IF;
+
+  /* Policz ile miejsc zajętych */
+  SELECT LICZBA_MIEJSC - LICZBA_WOLNYCH_MIEJSC INTO zajeta_liczba_miejsc
+    FROM WYCIECZKI WHERE ID_WYCIECZKI = zmien_liczbe_miejsc_2.id_wycieczki;
+  /* Jeśli liczba miejsc ujemna lub mniejsza od ilości zarezerwowanych -> BŁĄD*/
+  IF nowa_liczba_miejsc < 0 OR zajeta_liczba_miejsc > nowa_liczba_miejsc THEN
+    raise_application_error(-20001, 'Not enough spots.');
+  END IF;
+
+  /* Updatuj */
+  UPDATE WYCIECZKI SET
+      LICZBA_MIEJSC=zmien_liczbe_miejsc_2.nowa_liczba_miejsc,
+      LICZBA_WOLNYCH_MIEJSC=
+          zmien_liczbe_miejsc_2.nowa_liczba_miejsc-zmien_liczbe_miejsc_2.zajeta_liczba_miejsc
+    WHERE ID_WYCIECZKI=zmien_liczbe_miejsc_2.id_wycieczki;
+END zmien_liczbe_miejsc_2; 
+    #+end_src
+
+* Dziennikowanie przy pomocy triggerów
+  Należy wprowadzić zmianę która spowoduje że zapis do dziennika rezerwacji będzie realizowany przy pomocy triggerów.
+** Dodanie rezerwacji
+   Trigger obsługujący dodanie rezerwacji.
+   #+begin_src sql
+   
+   #+end_src
+
+** Zmiana statusu
+   Trigger obsługujący zmianę statusu.
+   #+begin_src sql
+   
+   #+end_src
+
+** Usuwanie
+   Trigger zabraniający usunięcia rezerwacji.
+   #+begin_src sql
+   
+   #+end_src
+
+* Obsługa redundantego pola ~liczba​_wolnych​_miejsc~ przy pomocy tiggerów
+  Zmiana strategii obsługi redundantnego pola ~liczba​_wolnych​_miejsc~. Realizacja przy pomocy triggerów.
+** Dodanie rezerwacji
+   Trigger obsługujący dodanie rezerwacji.
+   #+begin_src sql
+   
+   #+end_src
+
+** Zmiana statusu
+   Trigger obsługujący zmianę statusu na anulowany lub z anulowanego.
+   #+begin_src sql
+   
+   #+end_src
+
+** Update wycieczki
+   Trigger obsługujący zmianę liczby miejsc na poziomie wycieczki.
+   #+begin_src sql
+   
+   #+end_src
