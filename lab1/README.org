@@ -1,4 +1,5 @@
 #+TITLE: Oracle PL/SQL - Sprawozdanie
+#+Author: Dawid Macek
 #+LANGUAGE: pl
 #+OPTIONS: date:nil
 #+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
