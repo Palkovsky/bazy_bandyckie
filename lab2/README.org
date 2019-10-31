@@ -1,0 +1,441 @@
+#+TITLE: .NET, Entity Framework - Sprawozdanie
+#+Author: Dawid Macek
+#+LANGUAGE: pl
+#+OPTIONS: date:nil
+#+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
+#+LATEX_HEADER: \usepackage[AUTO]{babel}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
+
+* Wstęp
+  Aplikacja to projekt sklepu bazujący na Windows Formach.
+  Stanowi ona rozszerzenie funkcjonalności tworzonych na laboratoriach.
+  Aplikacja posiada dwie wersje, jedną dla klientów, a drugą dla właściciela skelpu.
+
+** Wersja kliencka
+  Wersja kliencka pozwala:
+    - przeglądać dostępne produkty
+    - przeszukiwać katalog produktów
+    - składać zamówienia 
+    - śledzić status złożonych zamówień.
+  
+** Wersja administracyjna
+  Wersja administracyjna pozwala na :
+    - uzupełnianie stanu magazynu
+    - rejestrację użytkowników
+    - oznaczanie zamówień jako wysłanych
+    - tworzenie nowych produktów
+
+#+LATEX: \newpage
+* Model
+  
+  Schemat bazuje na tym co było tworzone na laboratoriach.
+
+** Zmiany względem laboratoriów
+  Wprowadzone zmiany to:
+  - Nowa tabela ~Orders~
+  - Pola ~Admin~ / ~Password~ w tabeli ~Customers~
+  - Dodanie ~CusotmerId~ jako klucza głównego w ~Customers~
+
+
+  #+CAPTION: Schemat bazy danych
+  #+NAME:   fig:scheme
+  [[./images/scheme.PNG]]
+
+  #+LATEX: \newpage
+** Definicja Code First
+   W definicji utworzyłem pomiędzy wszystkimi powiązanymi tabelami odpowiednie ~Navigation Properties~ aby móc wygodnie odczytywać powiązane dane.
+
+   #+CAPTION: Opis tabeli Categories
+   #+begin_src
+    public class Category
+    {
+        public Category() {
+            Products = new List<Product>();
+        }
+
+        public int CategoryId { get; set; }
+        public string Name { get; set; }
+        public List<Product> Products { get; set; }
+    }   
+   #+end_src
+
+   #+CAPTION: Opis tabeli Products
+   #+begin_src 
+    public class Product
+    {
+        public Product() {
+            Orders = new List<Order>();
+        }
+
+        public int ProductId { get; set; }
+        public string Name { get; set; }
+        public int UnitsInStock { get; set; }
+
+        [ForeignKey("Category")]
+        public int CategoryId { get; set; }
+        public Category Category { get; set; }
+
+        public List<Order> Orders { get; set; }
+    }   
+   #+end_src
+
+   #+CAPTION: Opis tabeli Customers
+   #+begin_src 
+    public class Customer
+    {
+        public Customer() {
+            Orders = new List<Order>();
+        }
+
+        public int CustomerId {get; set; }
+        public string CompanyName { get; set; }
+        public string Password { get; set; }
+        public string Description { get; set; }
+        public bool Admin { get; set; }
+        public List<Order> Orders { get; set; }
+    }   
+   #+end_src
+
+
+   #+CAPTION: Opis tabeli Orders
+   #+begin_src 
+    public class Order
+    {
+        public int OrderId { get; set; }
+        public int Quantity { get; set; }
+        public bool Shipped { get; set; }
+
+        [ForeignKey("Customer")]
+        public int CustomerId { get; set; }
+        public Customer Customer { get; set; }
+
+        [ForeignKey("Product")]
+        public int ProductId { get; set; }
+        public Product Product { get; set; }
+    }   
+   #+end_src
+
+ 
+* Logowanie
+   Na początku użytkownik jest proszony o podanie nazwy(CompanyName) oraz hasła.
+   Jeżeli wprowadzone dane nie pokrywają się, wyświetlany jest odpowiedni komunikat.
+
+   #+CAPTION: Okno logowania
+   #+attr_latex: :width 200px
+   [[./images/7.PNG]]
+
+** Kod
+   Do pobrania użytkownika z odpowiadającym hasłem używane jest ~Query Expression Syntax~.
+   To jaką wersję aplikacji użytkownik zobaczy zależy od tego czy ma ustawioną flagę ~Admin~.
+   #+CAPTION: Kod formularza logowania
+   #+begin_src 
+public partial class LogInForm : Form
+    {
+        private ShopContext db;
+
+        public LogInForm()
+        {
+            db = new ShopContext();
+            InitializeComponent();
+        }
+
+        // Obsługa klinięcia na przycisk Login
+        private void logInBtn_Click(object sender, EventArgs e)
+        {
+            string username = usernameInputBox.Text;
+            string password = passwordInputBox.Text;
+            Customer user = (from c in db.Customers
+                             where c.CompanyName == username && c.Password == password
+                             select c)
+                       .DefaultIfEmpty(null)
+                       .First();
+
+            if (user == null)
+            {
+                MessageBox.Show("Invalid credentials.");
+            }
+            else if (user.Admin)
+            {
+                this.Hide();
+                AdminForm form = new AdminForm(user);
+                form.Text = "Admin Panel";
+                form.MaximizeBox = false;
+                form.MinimizeBox = false;
+                form.FormBorderStyle = FormBorderStyle.FixedSingle;
+                form.ShowDialog();
+                this.Close();
+            }
+            else 
+            {
+                this.Hide();
+                CustomerForm form = new CustomerForm(user);
+                form.Text = "Online Shop";
+                form.MaximizeBox = false;
+                form.MinimizeBox = false;
+                form.FormBorderStyle = FormBorderStyle.FixedSingle;
+                form.ShowDialog();
+                this.Close();
+            }
+        }
+    }   
+   #+end_src
+
+
+* Panel użytkownika
+   Panel użytkownika podzielny jest na trzy części:
+     - listę złożonych zamówień przez obecnie zalogowanego
+     - wyszukiwarkę produktów
+     - panelu wyświetlającego szczególy o produktach/zamówieniach 
+
+#+attr_latex: :width 400px
+   #+CAPTION: Informacje o produkcie
+   [[./images/1.PNG]]
+
+#+attr_latex: :width 400px
+   #+CAPTION: Informacje o zamówieniu
+   [[./images/2.PNG]]
+
+** Kod
+    Tutaj dla odmiany używam ~Query Method Syntax~.
+    W poniższym kodzie jest zawarta logika odpowiadająca za składanie zamówienia.
+    Używamy tutaj ~Eager Loading~, aby móc wyświetlić kategorię wybranego produktu.
+
+   #+CAPTION: Kod formularza klienta
+#+begin_src 
+    public partial class CustomerForm : Form
+    {
+        private ShopContext ctx;
+        private Customer user;
+
+        private List<Product> loadedProducts;
+        private List<Order> loadedOrders;
+        private Product currentProduct;
+        private Order currentOrder;
+
+        public CustomerForm(Customer user)
+        {
+            this.ctx = new ShopContext();
+            this.user = user;
+
+            InitializeComponent();
+            RefreshAll();
+        }
+
+        // Ustawia produnkt na panelu bocznym
+        private void SetProduct(Product product) {
+            currentProduct = product;
+            currentOrder = null;
+            orderBox.Visible = false;
+
+            productNameLabel.Text = product.Name;
+            productDescriptionLabel.Text = "Category: " + product.Category.Name;
+            productInStockLabel.Text = "Units in stock: " + product.UnitsInStock;
+            productBox.Visible = true;
+            productBox.BringToFront();
+        }
+
+        // Ustawia zamówienie na panelu bocznym
+        private void SetOrder(Order order)
+        {
+            currentProduct = null;
+            currentOrder = order;
+            orderBox.Visible = true;
+            productBox.Visible = false;
+
+            orderTitleLabel.Text = "Order identificator: " + order.OrderId;
+            orderProductLabel.Text = order.Quantity + "x " + order.Product.Name;
+            if (order.Shipped) {
+                orderShippingState.Text = "Order was shipped.";
+            } else {
+                orderShippingState.Text = "Order awaiting shipment.";
+            }
+
+            orderBox.BringToFront();
+        }
+
+        // Odświeża lsitę produktów uwzględniając to co jest wpisane w wyszukiwarce.
+        private void RefreshProducts() {
+            productsListView.Items.Clear();
+            string query = searchBox.Text.Trim().ToLower();
+            
+            if (query.Length > 0)
+            {
+                loadedProducts = ctx.Products
+                    .Include("Category")
+                    .Where(p => p.Name.ToLower().Contains(query.ToLower()))
+                    .ToList();
+            }
+            else {
+                loadedProducts = ctx.Products
+                    .Include("Category")
+                    .ToList();
+            }
+
+            foreach (Product product in loadedProducts)
+            {
+                ListViewItem row = new ListViewItem(new String[]{product.ProductId+"", product.Name});
+                productsListView.Items.Add(row);
+            }
+        }
+
+        // Odświeża zamówienia
+        private void RefreshOrders() {
+            ordersListView.Items.Clear();
+            loadedOrders = ctx.Orders
+                .Include("Product")
+                .Where(ord => ord.CustomerId == user.CustomerId)
+                .ToList();
+            foreach (Order order in loadedOrders)
+            {
+                ListViewItem row = new ListViewItem(new String[] { order.Product.Name, order.Quantity + "" });
+                ordersListView.Items.Add(row);
+            }
+        }
+        
+        // Odświeża wszystko
+        private void RefreshAll()
+        {
+            usernameLabel.Text = "Logged in as " + this.user.CompanyName;
+            RefreshProducts();
+            RefreshOrders();
+        }
+
+        // Obsługuje złożenie zamówienia
+        private void orderBtn_Click(object sender, EventArgs e)
+        {
+            if (currentProduct != null) {
+                int qty;
+                try
+                {
+                    qty = Decimal.ToInt32(orderQuantityUpDown.Value);
+                }
+                catch (OverflowException exception)
+                {
+                    MessageBox.Show(exception.ToString());
+                    return;
+                }
+
+                if (qty > currentProduct.UnitsInStock)
+                {
+                    MessageBox.Show("Invalid quantity. Maximum allowed is " + currentProduct.UnitsInStock + ".");
+                    return;
+                }
+
+                Order newOrder = new Order { 
+                    Quantity = qty, 
+                    Shipped = false,
+                    CustomerId = user.CustomerId, 
+                    ProductId = currentProduct.ProductId 
+                };
+                currentProduct.UnitsInStock -= qty;
+                ctx.Orders.Add(newOrder);
+                ctx.SaveChanges();
+                RefreshOrders();
+                SetProduct(currentProduct);
+            }
+        }
+
+        private void logOutBtn_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void searchBox_TextChanged(object sender, EventArgs e)
+        {
+            RefreshProducts();
+        }
+
+        // Kliknięcie na listę produktów
+        private void productsListView_ItemActivate(object sender, EventArgs e)
+        {
+            int i = productsListView.SelectedIndices[0];
+            if (i < loadedProducts.Count) {
+                SetProduct(loadedProducts[i]);
+            }
+        }
+
+        // Kliknięcie na listę zamówień
+        private void ordersListView_ItemActivate(object sender, EventArgs e)
+        {
+            int i = ordersListView.SelectedIndices[0];
+            if (i < loadedOrders.Count)
+            {
+                SetOrder(loadedOrders[i]);
+            }
+        }
+    }
+#+end_src
+
+* Panel administratora
+
+  Do stworzenia panelu administratora użyłem podobnej strategii co na laboratoriach, czyli za pomocą ~DataGridView~.
+  Bolączką tego jest to, że do powiązanych tabeli trzeba używać identyfikatorów numerycznych.
+  Idelanie by było gdyby dla powiązanych pól dało się utworzyć rozwijaną listę z której zostałby wybrany powiązany wiersz.
+
+  #+CAPTION: Panel administracyjny
+  [[./images/4.PNG]]
+
+** Kod
+   Tutaj do modyfikowania używam zbindowanych list do ~DataGridView~.
+   Dla każdej tabeli stworzona jest osobna zakładka.
+
+
+  #+CAPTION: Kod formularza administratora
+  #+begin_src 
+    public partial class AdminForm : Form
+    {
+        private ShopContext ctx;
+        private Customer user;
+
+        public AdminForm(Customer user)
+        {
+            this.ctx = new ShopContext();
+            this.user = user;
+
+            InitializeComponent();
+            BindAll();
+        }
+        
+        // Powiązuje wszystkie tabele z odpowiednimi DataGridView
+        private void BindAll() {
+            ctx.Categories.Load();
+            categoryDataGridView.DataSource = ctx.Categories.Local.ToBindingList();
+
+            ctx.Customers.Load();
+            customerDataGridView.DataSource = ctx.Customers.Local.ToBindingList();
+
+            ctx.Orders.Include("Customer").Include("Product").Load();
+            orderDataGridView.DataSource = ctx.Orders.Local.ToBindingList();
+
+            ctx.Products.Include("Category").Load();
+            productDataGridView.DataSource = ctx.Products.Local.ToBindingList();
+        }
+
+        private void categoryDataGridView_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {}
+
+        private void categorySaveBtn_Click(object sender, EventArgs e)
+        {
+            this.ctx.SaveChanges();
+            categoryDataGridView.Refresh();
+        }
+
+        private void customersSaveBtn_Click(object sender, EventArgs e)
+        {
+            this.ctx.SaveChanges();
+            customerDataGridView.Refresh();
+        }
+
+        private void orderSaveBtn_Click(object sender, EventArgs e)
+        {
+            this.ctx.SaveChanges();
+            orderDataGridView.Refresh();
+        }
+
+        private void productBtn_Click(object sender, EventArgs e)
+        {
+            this.ctx.SaveChanges();
+            productDataGridView.Refresh();
+        }
+    }  
+  #+end_src

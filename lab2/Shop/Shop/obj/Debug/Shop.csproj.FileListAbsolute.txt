@@ -1,0 +1,17 @@
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\bin\Debug\Shop.exe.config
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\bin\Debug\Shop.exe
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\bin\Debug\Shop.pdb
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.csprojResolveAssemblyReference.cache
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.Properties.Resources.resources
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.csproj.GenerateResource.Cache
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.exe
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.pdb
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\bin\Debug\EntityFramework.dll
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\bin\Debug\EntityFramework.xml
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.Migrations.Init.resources
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.Migrations.FixCategory.resources
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.Migrations.AddPassword.resources
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.CustomerForm.resources
+c:\users\student\documents\visual studio 2012\Projects\Shop\Shop\obj\Debug\Shop.LogInForm.resources
+C:\Users\student\Documents\Visual Studio 2012\Projects\Shop\Shop\obj\Debug\Shop.Migrations.AddShippedToOrder.resources
+C:\Users\student\Documents\Visual Studio 2012\Projects\Shop\Shop\obj\Debug\Shop.AdminForm.resources
