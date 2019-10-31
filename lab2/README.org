@@ -369,16 +369,15 @@ public partial class LogInForm : Form
 * Panel administratora
 
   Do stworzenia panelu administratora użyłem podobnej strategii co na laboratoriach, czyli za pomocą ~DataGridView~.
-  Bolączką tego jest to, że do powiązanych tabeli trzeba używać identyfikatorów numerycznych.
-  Idelanie by było gdyby dla powiązanych pól dało się utworzyć rozwijaną listę z której zostałby wybrany powiązany wiersz.
+  Bolączką tego jest to, że dla powiązanych tabeli trzeba używać identyfikatorów numerycznych.
+  Idelanie by było gdyby dla powiązanych pól dało się utworzyć rozwijaną listę z której zostałby wybrany powiązana krotka.
 
   #+CAPTION: Panel administracyjny
   [[./images/4.PNG]]
 
 ** Kod
-   Tutaj do modyfikowania używam zbindowanych list do ~DataGridView~.
    Dla każdej tabeli stworzona jest osobna zakładka.
-
+   Jedyne co robimy to bindujemy do ~DataGridView~ i obsługujemy zapis.
 
   #+CAPTION: Kod formularza administratora
   #+begin_src 
