@@ -1,1 +1,3 @@
 * Bazy inaczej bandyckie
+
+[[./logo.png]]
