@@ -1,0 +1,618 @@
+#+TITLE: Hibernate - Sprawozdanie
+#+Author: Dawid Macek
+#+LANGUAGE: pl
+#+OPTIONS: date:nil
+#+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
+#+LATEX_HEADER: \usepackage[AUTO]{babel}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
+
+* Session Factory
+  Fabryka służąca do generowania sesji Hibernate.
+  Będzie się przewijała w różnych miejscach.
+
+  #+begin_src java
+  public class HibernateUtils {
+
+    private static final SessionFactory sessionFactory;
+
+    private HibernateUtils() {}
+
+    static {
+        try {
+            sessionFactory = new Configuration().configure().buildSessionFactory();
+        } catch (Throwable ex) {
+            System.err.println("Initial SessionFactory creation failed." + ex);
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    public static SessionFactory getSessionFactory() {
+        return sessionFactory;
+    }
+
+    public static void shutdown() {
+        getSessionFactory().close();
+    }
+}
+  #+end_src
+
+* Produkty
+** Definicja 
+   #+begin_src java
+@Entity(name="products")
+public class Product {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private int id;
+
+    private String productName;
+    private int unitsOnStock;
+
+    public Product() {
+    }
+
+    public Product(String productName, int unitsOnStock) {
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+    }
+}
+   #+end_src
+
+** Dodawnie produktu
+
+   #+begin_src java
+   public class App {
+
+    public static void main(String[] args) {
+        addNewProduct();
+    }
+
+    private static void addNewProduct() {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Scanner inputScanner = new Scanner(System.in);
+
+            System.out.println("Product Name:" );
+            String prodName = inputScanner.nextLine();
+            System.out.println("Units in Stock:");
+            int prodUnits = inputScanner.nextInt();
+
+            Product product = new Product(prodName, prodUnits);
+            Transaction tx = session.beginTransaction();
+            session.save(product);
+            tx.commit();
+        }
+    }
+}
+   #+end_src
+
+** Screeny
+   [[./imgs/1a.png]]
+   [[./imgs/1b.png]]
+   [[./imgs/1c.png]]
+
+* Dostawcy i relacja jednostronna
+** Definicja
+   #+begin_src java
+@Entity(name="suppliers")
+public class Supplier {
+    @Id
+    private String companyName;
+    private String street;
+    private String city;
+
+    public Supplier() { }
+
+    public Supplier(String companyName, String street, String city) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+    }
+}
+
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    @ManyToOne
+    @JoinColumn
+    private Supplier supplier;
+
+    public Product() {}
+
+    public Product(String productName, int unitsOnStock) {
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+        this.supplier = null;
+    }
+
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
+    }
+}
+   #+end_src
+** Wstawianie do bazy
+   #+begin_src java
+    public static void main(String[] args) {
+        Product p = addNewProduct();
+        Supplier s = addNewSupplier();
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            p.setSupplier(s);
+            session.update(p);
+            tx.commit();
+        }
+    } 
+    private static Supplier addNewSupplier() {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            Supplier supplier = new Supplier("Coca-Cola", "Jesionowa", "Warszawa");
+            session.save(supplier);
+            tx.commit();
+            return supplier;
+        }
+    }
+    private static Product addNewProduct() {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Product product = new Product("Czipsy", 100);
+            Transaction tx = session.beginTransaction();
+            session.save(product);
+            tx.commit();
+            return product;
+        }
+   }  
+   #+end_src
+** Screeny
+[[./imgs/2a.png]]
+[[./imgs/2b.png]]
+[[./imgs/2c.png]]
+[[./imgs/2d.png]]
+[[./imgs/2e.png]]
+
+* Odwrócenie relacji
+** Bez tabeli łącznikowej
+*** Definicja
+   #+begin_src java
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    public Product() {
+    }
+
+    public Product(String productName, int unitsOnStock) {
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+    }
+}
+
+@Entity(name="suppliers")
+public class Supplier {
+    @Id
+    private String companyName;
+    private String street;
+    private String city;
+
+    @OneToMany
+    @JoinColumn
+    private Set<Product> suppliedProducts;
+
+    public Supplier() { }
+
+    public Supplier(String companyName, String street, String city) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public Set<Product> getSuppliedProducts() {
+        return suppliedProducts;
+    }
+}
+#+end_src
+
+*** Screeny
+[[./imgs/3a.png]]
+[[./imgs/3b.png]]
+[[./imgs/3c.png]]
+[[./imgs/3d.png]]
+[[./imgs/3e.png]]
+
+** Z tabelą łącznikową
+*** Definicja
+    #+begin_src java
+@Entity(name="suppliers")
+public class Supplier {
+    @Id
+    private String companyName;
+    private String street;
+    private String city;
+
+    @OneToMany
+    private Set<Product> suppliedProducts;
+
+    public Supplier() { }
+
+    public Supplier(String companyName, String street, String city) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public Set<Product> getSuppliedProducts() {
+        return suppliedProducts;
+    }
+}
+
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    public Product() {
+    }
+
+    public Product(String productName, int unitsOnStock) {
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+    }
+}
+    
+    #+end_src
+*** Screeny
+[[./imgs/4a.png]]
+[[./imgs/4b.png]]
+[[./imgs/4c.png]]
+[[./imgs/4d.png]]
+[[./imgs/4e.png]]
+[[./imgs/4f.png]]
+[[./imgs/4g.png]]
+** Dodawanie danych (oba przypadki)
+   #+begin_src java
+    public static void main(String[] args) {
+        Set<Product> products = addManyProducts();
+        Supplier s = addNewSupplier();
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            for(Product p : products) {
+                s.getSuppliedProducts().add(p);
+            }
+            session.update(s);
+            tx.commit();
+        }
+    }
+
+    private static Set<Product> addManyProducts() {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            Set<Product> products = new HashSet<>();
+            products.add(new Product("Czipsy", 100));
+            products.add(new Product("Kola", 10));
+            products.add(new Product("Ryby", 5));
+            products.add(new Product("Lizaki", 50));
+            for(Product product : products) {
+                session.save(product);
+            }
+            tx.commit();
+            return products;
+        }
+    }   
+   #+end_src
+* Relacja obustronna
+** Definicja
+   #+begin_src java
+@Entity(name="suppliers")
+public class Supplier {
+    @Id
+    private String companyName;
+    private String street;
+    private String city;
+
+    @OneToMany
+    private Set<Product> suppliedProducts;
+
+    public Supplier() { }
+
+    public Supplier(String companyName, String street, String city) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public Set<Product> getSuppliedProducts() {
+        return suppliedProducts;
+    }
+}
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    @ManyToOne
+    private Supplier supplier;
+
+    public Product() {
+    }
+
+    public Product(String productName, int unitsOnStock) {
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+        this.supplier = null;
+    }
+
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
+    }
+}
+
+   #+end_src
+** Dodawanie danych
+   #+begin_src java
+    public static void main(String[] args) {
+        Set<Product> products = addManyProducts();
+        Supplier s = addNewSupplier();
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            for(Product p : products) {
+                s.getSuppliedProducts().add(p);
+                p.setSupplier(s);
+                session.update(p);
+            }
+            session.update(s);
+            tx.commit();
+        }
+    }
+
+    private static Set<Product> addManyProducts() {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            Set<Product> products = new HashSet<>();
+            products.add(new Product("Czipsy", 100));
+            products.add(new Product("Kola", 10));
+            products.add(new Product("Ryby", 5));
+            products.add(new Product("Lizaki", 50));
+            for(Product product : products) {
+                session.save(product);
+            }
+            tx.commit();
+            return products;
+        }
+    }
+   #+end_src
+** Screeny
+[[./imgs/5a.png]]
+[[./imgs/5b.png]]
+[[./imgs/5c.png]]
+[[./imgs/5d.png]]
+[[./imgs/5e.png]]
+[[./imgs/5f.png]]
+* Kategorie
+** Definicja
+   #+begin_src java
+@Entity(name="categories")
+public class Category {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private int categoryId;
+    private String name;
+
+    @OneToMany
+    @JoinColumn
+    private List<Product> products;
+
+    public Category(String name) {
+        this.name = name;
+        this.products = new ArrayList<>();
+    }
+
+    public Category() { }
+
+    public List<Product> getProducts() {
+        return products;
+    }
+}
+   
+   #+end_src
+** Dodawanie danych
+   #+begin_src java
+    public static void main(String[] args) {
+        Supplier supplier = addNewSupplier();
+        List<Category> categories = addCategoriesWithProducts();
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            for(Category cat : categories) {
+                for (Product product : cat.getProducts()) {
+                    product.setSupplier(supplier);
+                    supplier.getSuppliedProducts().add(product);
+                    session.update(product);
+                }
+            }
+            session.update(supplier);
+            tx.commit();
+        }
+    }
+
+    private static List<Category> addCategoriesWithProducts() {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            List<Category> categories = new ArrayList<>();
+
+            Category cat1 = new Category("Picie");
+            cat1.getProducts().add(new Product("Kola", 21));
+            cat1.getProducts().add(new Product("Pepsi", 37));
+            cat1.getProducts().add(new Product("Fanta", 666));
+
+            Category cat2 = new Category("Jedzenie");
+            cat2.getProducts().add(new Product("Czipsy", 10));
+            cat2.getProducts().add(new Product("Lizaki", 20));
+            cat2.getProducts().add(new Product("Ryby", 30));
+
+            Category cat3 = new Category("Elektronika") ;
+            cat3.getProducts().add(new Product("MP3", 3));
+            cat3.getProducts().add(new Product("MP4", 4));
+            cat3.getProducts().add(new Product("MP5", 5));
+
+            categories.add(cat1);
+            categories.add(cat2);
+            categories.add(cat3);
+            for(Category cat : categories) {
+                for(Product product : cat.getProducts()) {
+                    product.setCategory(cat);
+                    session.save(product);
+                }
+                session.save(cat);
+            }
+
+            tx.commit();
+            return categories;
+        }
+    }
+   #+end_src
+** Wydobywanie produktów z wybranej kategorii oraz kategorii do której należy wybrany produkt
+   #+begin_src java
+    private static Category getProductCategory(Product product) {
+        return product.getCategory();
+    }
+
+    private static List<Product> getProductsFromCategory(Category cat) {
+        return cat.getProducts();
+    }   
+   #+end_src
+** Screeny
+[[./imgs/6a.png]]
+[[./imgs/6b.png]]
+[[./imgs/6c.png]]
+[[./imgs/6d.png]]
+[[./imgs/6e.png]]
+[[./imgs/6f.png]]
+[[./imgs/6g.png]]
+[[./imgs/6h.png]]
+* Relacja wiele-do-wiele
+** Definicja
+   #+begin_src java
+@Entity(name="invoices")
+public class Invoice {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private int invoiceNumber;
+    private int quantity;
+
+    @ManyToMany
+    private Set<Product> products;
+
+    public Invoice() {
+        this.products = new HashSet<>();
+    }
+
+    public Invoice(int quantity) {
+        this();
+        this.quantity = quantity;
+    }
+
+    public Set<Product> getProducts() {
+        return products;
+    }
+}
+
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    @ManyToOne
+    private Supplier supplier;
+
+    @ManyToOne
+    private Category category;
+
+    @ManyToMany
+    private Set<Invoice> invoices;
+
+    public Product() {
+        this.invoices = new HashSet<>();
+        this.supplier = null;
+        this.category = null;
+    }
+
+    public Product(String productName, int unitsOnStock) {
+        this();
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+    }
+
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
+    }
+
+    public Category getCategory() {
+        return category;
+    }
+
+    public void setCategory(Category category) {
+        this.category = category;
+    }
+
+    public Set<Invoice> getInvoices() {
+        return invoices;
+    }
+}   
+   #+end_src
+** Dodawanie do bazy
+   #+begin_src java
+    public static void main(String[] args) {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+
+            Product p1 = new Product("Czipsy", 100);
+            Product p2 = new Product("Kola", 10);
+            Product p3 = new Product("Ryby", 5);
+            Product p4 = new Product("Klocki", 5);
+
+            Invoice i1 = new Invoice();
+            Invoice i2 = new Invoice();
+
+            i1.getProducts().add(p1);
+            p1.getInvoices().add(i1);
+            i1.getProducts().add(p2);
+            p2.getInvoices().add(i1);
+            i1.getProducts().add(p3);
+            p3.getInvoices().add(i1);
+
+            i2.getProducts().add(p2);
+            p2.getInvoices().add(i2);
+            i2.getProducts().add(p4);
+            p2.getInvoices().add(i2);
+
+            session.save(p1);
+            session.save(p2);
+            session.save(p3);
+            session.save(p4);
+            session.save(i1);
+            session.save(i2);
+
+            tx.commit();
+        }
+    }   
+   #+end_src
+** Screeny 
+[[./imgs/7a.png]]
+[[./imgs/7b.png]]
+[[./imgs/7c.png]]
+[[./imgs/7d.png]]
+[[./imgs/7e.png]]
+[[./imgs/7f.png]]
+[[./imgs/7g.png]]

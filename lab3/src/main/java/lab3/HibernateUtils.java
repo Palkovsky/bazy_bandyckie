@@ -3,12 +3,11 @@ package lab3;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 
-
 public class HibernateUtils {
 
-    private HibernateUtils() {}
-
     private static final SessionFactory sessionFactory;
+
+    private HibernateUtils() {}
 
     static {
         try {
@@ -24,7 +23,6 @@ public class HibernateUtils {
     }
 
     public static void shutdown() {
-
         getSessionFactory().close();
     }
 }
