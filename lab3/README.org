@@ -582,8 +582,8 @@ public class Product {
             Product p3 = new Product("Ryby", 5);
             Product p4 = new Product("Klocki", 5);
 
-            Invoice i1 = new Invoice();
-            Invoice i2 = new Invoice();
+            Invoice i1 = new Invoice(2);
+            Invoice i2 = new Invoice(3);
 
             i1.getProducts().add(p1);
             p1.getInvoices().add(i1);
@@ -614,5 +614,264 @@ public class Product {
 [[./imgs/7c.png]]
 [[./imgs/7d.png]]
 [[./imgs/7e.png]]
-[[./imgs/7f.png]]
-[[./imgs/7g.png]]
+** Logi
+   #+begin_src 
+Hibernate:
+
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate:
+
+    create table categories_products (
+       categories_categoryId integer not null,
+        products_productName varchar(255) not null
+    )
+Hibernate:
+
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate:
+
+    create table invoices_products (
+       invoices_invoiceNumber integer not null,
+        products_productName varchar(255) not null,
+        primary key (invoices_invoiceNumber, products_productName)
+    )
+Hibernate:
+
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate:
+
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate:
+
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate:
+
+    create table suppliers_products (
+       suppliers_companyName varchar(255) not null,
+        suppliedProducts_productName varchar(255) not null,
+        primary key (suppliers_companyName, suppliedProducts_productName)
+    )
+Hibernate:
+
+    alter table categories_products
+       add constraint UK_e7p6od1yxp6s6prnjrnkwh1lg unique (products_productName)
+Hibernate:
+
+    alter table suppliers_products
+       add constraint UK_c856gagly0f0xv1n05lejog7j unique (suppliedProducts_productName)
+Hibernate:
+
+    alter table categories_products
+       add constraint FKtfom8iqgvch9acnd61recbfk0
+       foreign key (products_productName)
+       references products
+Hibernate:
+
+    alter table categories_products
+       add constraint FKsg6yecsm576qfwq5f7v8sr3ho
+       foreign key (categories_categoryId)
+       references categories
+Hibernate:
+
+    alter table invoices_products
+       add constraint FK64itqr5js0tvv3x15m7thoqoh
+       foreign key (products_productName)
+       references products
+Hibernate:
+
+    alter table invoices_products
+       add constraint FKg6v0msu0o5kvkwyp0j8hpnrqc
+       foreign key (invoices_invoiceNumber)
+       references invoices
+Hibernate:
+
+    alter table products
+       add constraint FK39q5abaso5mmwgaslrltaxa0c
+       foreign key (category_categoryId)
+       references categories
+Hibernate:
+
+    alter table products
+       add constraint FK6u1jre85l46o98fl81tbndqdl
+       foreign key (supplier_companyName)
+       references suppliers
+Hibernate:
+
+    alter table products_invoices
+       add constraint FK188akj3woqp8b2n19q3akqbmi
+       foreign key (invoices_invoiceNumber)
+       references invoices
+Hibernate:
+
+    alter table products_invoices
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma
+       foreign key (products_productName)
+       references products
+Hibernate:
+
+    alter table suppliers_products
+       add constraint FKqqodc7m7xno62tb9sd7aopo52
+       foreign key (suppliedProducts_productName)
+       references products
+Hibernate:
+
+    alter table suppliers_products
+       add constraint FKl0xw81c7omyx9xy9rgt38gxc9
+       foreign key (suppliers_companyName)
+       references suppliers
+Hibernate:
+
+values
+    next value for hibernate_sequence
+Hibernate:
+
+values
+    next value for hibernate_sequence
+Hibernate:
+    /* insert lab3.model.Product
+        */ insert
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+        values
+            (?, ?, ?, ?)
+Hibernate:
+    /* insert lab3.model.Product
+        */ insert
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+        values
+            (?, ?, ?, ?)
+Hibernate:
+    /* insert lab3.model.Product
+        */ insert
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+        values
+            (?, ?, ?, ?)
+Hibernate:
+    /* insert lab3.model.Product
+        */ insert
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+        values
+            (?, ?, ?, ?)
+Hibernate:
+    /* insert lab3.model.Invoice
+        */ insert
+        into
+            invoices
+            (quantity, invoiceNumber)
+        values
+            (?, ?)
+Hibernate:
+    /* insert lab3.model.Invoice
+        */ insert
+        into
+            invoices
+            (quantity, invoiceNumber)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Product.invoices */ insert
+        into
+            products_invoices
+            (products_productName, invoices_invoiceNumber)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Product.invoices */ insert
+        into
+            products_invoices
+            (products_productName, invoices_invoiceNumber)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Product.invoices */ insert
+        into
+            products_invoices
+            (products_productName, invoices_invoiceNumber)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Product.invoices */ insert
+        into
+            products_invoices
+            (products_productName, invoices_invoiceNumber)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Invoice.products */ insert
+        into
+            invoices_products
+            (invoices_invoiceNumber, products_productName)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Invoice.products */ insert
+        into
+            invoices_products
+            (invoices_invoiceNumber, products_productName)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Invoice.products */ insert
+        into
+            invoices_products
+            (invoices_invoiceNumber, products_productName)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Invoice.products */ insert
+        into
+            invoices_products
+            (invoices_invoiceNumber, products_productName)
+        values
+            (?, ?)
+Hibernate:
+    /* insert collection
+        row lab3.model.Invoice.products */ insert
+        into
+            invoices_products
+            (invoices_invoiceNumber, products_productName)
+        values
+            (?, ?)   
+   #+end_src
+* JPA
+* Kaskady
+* Embedded class
+* Dziedziczenie

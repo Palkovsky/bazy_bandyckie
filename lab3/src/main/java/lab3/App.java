@@ -21,8 +21,8 @@ public class App {
             Product p3 = new Product("Ryby", 5);
             Product p4 = new Product("Klocki", 5);
 
-            Invoice i1 = new Invoice();
-            Invoice i2 = new Invoice();
+            Invoice i1 = new Invoice(2);
+            Invoice i2 = new Invoice(3);
 
             i1.getProducts().add(p1);
             p1.getInvoices().add(i1);
