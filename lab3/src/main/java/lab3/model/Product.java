@@ -12,9 +12,11 @@ public class Product {
     private int unitsOnStock;
 
     @ManyToOne
+    @JoinColumn
     private Supplier supplier;
 
     @ManyToOne
+    @JoinColumn
     private Category category;
 
     @ManyToMany
@@ -22,8 +24,6 @@ public class Product {
 
     public Product() {
         this.invoices = new HashSet<>();
-        this.supplier = null;
-        this.category = null;
     }
 
     public Product(String productName, int unitsOnStock) {
@@ -32,19 +32,19 @@ public class Product {
         this.unitsOnStock = unitsOnStock;
     }
 
-    public void setSupplier(Supplier supplier) {
-        this.supplier = supplier;
+    public Set<Invoice> getInvoices() {
+        return invoices;
     }
 
-    public Category getCategory() {
-        return category;
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
     }
 
     public void setCategory(Category category) {
         this.category = category;
     }
 
-    public Set<Invoice> getInvoices() {
-        return invoices;
+    public Category getCategory() {
+        return category;
     }
 }

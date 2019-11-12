@@ -42,14 +42,10 @@
 @Entity(name="products")
 public class Product {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private int id;
-
     private String productName;
     private int unitsOnStock;
 
-    public Product() {
-    }
+    public Product() {}
 
     public Product(String productName, int unitsOnStock) {
         this.productName = productName;
@@ -59,10 +55,8 @@ public class Product {
    #+end_src
 
 ** Dodawnie produktu
-
    #+begin_src java
-   public class App {
-
+public class App {
     public static void main(String[] args) {
         addNewProduct();
     }
@@ -71,7 +65,7 @@ public class Product {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Scanner inputScanner = new Scanner(System.in);
 
-            System.out.println("Product Name:" );
+            System.out.println("Product Name:");
             String prodName = inputScanner.nextLine();
             System.out.println("Units in Stock:");
             int prodUnits = inputScanner.nextInt();
@@ -85,10 +79,32 @@ public class Product {
 }
    #+end_src
 
+** Logi
+   #+begin_src 
+Hibernate:     
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        primary key (productName)
+    )
+
+Product Name:
+Czipsy
+Units in Stock:
+100
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)   
+   #+end_src
+
 ** Screeny
    [[./imgs/1a.png]]
    [[./imgs/1b.png]]
-   [[./imgs/1c.png]]
 
 * Dostawcy i relacja jednostronna
 ** Definicja
@@ -135,95 +151,125 @@ public class Product {
    #+end_src
 ** Wstawianie do bazy
    #+begin_src java
+public class App {
     public static void main(String[] args) {
-        Product p = addNewProduct();
-        Supplier s = addNewSupplier();
+        addNewProduct();
+        addNewSupplier();
+
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Product prod = session.get(Product.class, "Czipsy");
+            Supplier supplier = session.get(Supplier.class, "Coca-Cola");
+
             Transaction tx = session.beginTransaction();
-            p.setSupplier(s);
-            session.update(p);
+            prod.setSupplier(supplier);
+            session.update(prod);
             tx.commit();
         }
-    } 
-    private static Supplier addNewSupplier() {
+    }
+
+    private static void addNewSupplier() {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Transaction tx = session.beginTransaction();
             Supplier supplier = new Supplier("Coca-Cola", "Jesionowa", "Warszawa");
             session.save(supplier);
             tx.commit();
-            return supplier;
         }
     }
-    private static Product addNewProduct() {
+
+    private static void addNewProduct() {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Product product = new Product("Czipsy", 100);
             Transaction tx = session.beginTransaction();
             session.save(product);
             tx.commit();
-            return product;
         }
-   }  
+    }
+}
    #+end_src
+
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Nov 12, 2019 7:19:13 PM org.hibernate.resource.transaction.backend.jdbc.internal.DdlTransactionIsolatorNonJtaImpl getIsolatedConnection
+INFO: HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@9b9a327] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Supplier
+        */ insert 
+        into
+            suppliers
+            (city, street, companyName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    select
+        product0_.productName as productN1_0_0_,
+        product0_.supplier_companyName as supplier3_0_0_,
+        product0_.unitsOnStock as unitsOnS2_0_0_,
+        supplier1_.companyName as companyN1_1_1_,
+        supplier1_.city as city2_1_1_,
+        supplier1_.street as street3_1_1_ 
+    from
+        products product0_ 
+    left outer join
+        suppliers supplier1_ 
+            on product0_.supplier_companyName=supplier1_.companyName 
+    where
+        product0_.productName=?
+Hibernate: 
+    select
+        supplier0_.companyName as companyN1_1_0_,
+        supplier0_.city as city2_1_0_,
+        supplier0_.street as street3_1_0_ 
+    from
+        suppliers supplier0_ 
+    where
+        supplier0_.companyName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?   
+   #+end_src
+
 ** Screeny
 [[./imgs/2a.png]]
 [[./imgs/2b.png]]
 [[./imgs/2c.png]]
-[[./imgs/2d.png]]
-[[./imgs/2e.png]]
 
 * Odwrócenie relacji
-** Bez tabeli łącznikowej
-*** Definicja
-   #+begin_src java
-@Entity(name="products")
-public class Product {
-
-    @Id
-    private String productName;
-    private int unitsOnStock;
-
-    public Product() {
-    }
-
-    public Product(String productName, int unitsOnStock) {
-        this.productName = productName;
-        this.unitsOnStock = unitsOnStock;
-    }
-}
-
-@Entity(name="suppliers")
-public class Supplier {
-    @Id
-    private String companyName;
-    private String street;
-    private String city;
-
-    @OneToMany
-    @JoinColumn
-    private Set<Product> suppliedProducts;
-
-    public Supplier() { }
-
-    public Supplier(String companyName, String street, String city) {
-        this.companyName = companyName;
-        this.street = street;
-        this.city = city;
-        this.suppliedProducts = new HashSet<>();
-    }
-
-    public Set<Product> getSuppliedProducts() {
-        return suppliedProducts;
-    }
-}
-#+end_src
-
-*** Screeny
-[[./imgs/3a.png]]
-[[./imgs/3b.png]]
-[[./imgs/3c.png]]
-[[./imgs/3d.png]]
-[[./imgs/3e.png]]
-
 ** Z tabelą łącznikową
 *** Definicja
     #+begin_src java
@@ -237,7 +283,7 @@ public class Supplier {
     @OneToMany
     private Set<Product> suppliedProducts;
 
-    public Supplier() { }
+    public Supplier() {}
 
     public Supplier(String companyName, String street, String city) {
         this.companyName = companyName;
@@ -245,9 +291,9 @@ public class Supplier {
         this.city = city;
         this.suppliedProducts = new HashSet<>();
     }
-
-    public Set<Product> getSuppliedProducts() {
-        return suppliedProducts;
+    
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
     }
 }
 
@@ -258,35 +304,323 @@ public class Product {
     private String productName;
     private int unitsOnStock;
 
-    public Product() {
-    }
+    public Product() { }
 
     public Product(String productName, int unitsOnStock) {
         this.productName = productName;
         this.unitsOnStock = unitsOnStock;
     }
 }
+    #+end_src
+*** Logi  
+    #+begin_src 
+Hibernate: 
     
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        primary key (productName)
+    )
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    create table suppliers_products (
+       suppliers_companyName varchar(255) not null,
+        suppliedProducts_productName varchar(255) not null,
+        primary key (suppliers_companyName, suppliedProducts_productName)
+    )
+Hibernate: 
+    
+    alter table suppliers_products 
+       add constraint UK_c856gagly0f0xv1n05lejog7j unique (suppliedProducts_productName)
+Hibernate: 
+    
+    alter table suppliers_products 
+       add constraint FKqqodc7m7xno62tb9sd7aopo52 
+       foreign key (suppliedProducts_productName) 
+       references products
+Hibernate: 
+    
+    alter table suppliers_products 
+       add constraint FKl0xw81c7omyx9xy9rgt38gxc9 
+       foreign key (suppliers_companyName) 
+       references suppliers
+Hibernate: 
+    /* insert lab3.model.Supplier
+        */ insert 
+        into
+            suppliers
+            (city, street, companyName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    select
+        supplier0_.companyName as companyN1_1_0_,
+        supplier0_.city as city2_1_0_,
+        supplier0_.street as street3_1_0_ 
+    from
+        suppliers supplier0_ 
+    where
+        supplier0_.companyName=?
+Hibernate: 
+    select
+        suppliedpr0_.suppliers_companyName as supplier1_2_0_,
+        suppliedpr0_.suppliedProducts_productName as supplied2_2_0_,
+        product1_.productName as productN1_0_1_,
+        product1_.unitsOnStock as unitsOnS2_0_1_ 
+    from
+        suppliers_products suppliedpr0_ 
+    inner join
+        products product1_ 
+            on suppliedpr0_.suppliedProducts_productName=product1_.productName 
+    where
+        suppliedpr0_.suppliers_companyName=?
+Hibernate: 
+    /* insert collection
+        row lab3.model.Supplier.suppliedProducts */ insert 
+        into
+            suppliers_products
+            (suppliers_companyName, suppliedProducts_productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert collection
+        row lab3.model.Supplier.suppliedProducts */ insert 
+        into
+            suppliers_products
+            (suppliers_companyName, suppliedProducts_productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert collection
+        row lab3.model.Supplier.suppliedProducts */ insert 
+        into
+            suppliers_products
+            (suppliers_companyName, suppliedProducts_productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert collection
+        row lab3.model.Supplier.suppliedProducts */ insert 
+        into
+            suppliers_products
+            (suppliers_companyName, suppliedProducts_productName) 
+        values
+            (?, ?)    
     #+end_src
 *** Screeny
 [[./imgs/4a.png]]
 [[./imgs/4b.png]]
 [[./imgs/4c.png]]
 [[./imgs/4d.png]]
-[[./imgs/4e.png]]
-[[./imgs/4f.png]]
-[[./imgs/4g.png]]
+** Bez tabeli łącznikowej
+*** Definicja
+    Wystarczy dodać anotację @JoinColumn na polu kolekcji powiązanych encji.
+
+    #+begin_src java
+@Entity(name="suppliers")
+public class Supplier {
+    @Id
+    private String companyName;
+    private String street;
+    private String city;
+
+    @OneToMany
+    @JoinColumn
+    private Set<Product> suppliedProducts;
+
+    public Supplier() {}
+
+    public Supplier(String companyName, String street, String city) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
+    }
+}    
+    #+end_src
+*** Logi
+    #+begin_src 
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        suppliedProducts_companyName varchar(255),
+        primary key (productName)
+    )
+
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FKietrreddr9i4818ihlj1mecxl 
+       foreign key (suppliedProducts_companyName) 
+       references suppliers
+Hibernate: 
+    /* insert lab3.model.Supplier
+        */ insert 
+        into
+            suppliers
+            (city, street, companyName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (unitsOnStock, productName) 
+        values
+            (?, ?)
+Hibernate: 
+    select
+        supplier0_.companyName as companyN1_1_0_,
+        supplier0_.city as city2_1_0_,
+        supplier0_.street as street3_1_0_ 
+    from
+        suppliers supplier0_ 
+    where
+        supplier0_.companyName=?
+Hibernate: 
+    select
+        suppliedpr0_.suppliedProducts_companyName as supplied3_0_0_,
+        suppliedpr0_.productName as productN1_0_0_,
+        suppliedpr0_.productName as productN1_0_1_,
+        suppliedpr0_.unitsOnStock as unitsOnS2_0_1_ 
+    from
+        products suppliedpr0_ 
+    where
+        suppliedpr0_.suppliedProducts_companyName=?
+Hibernate: 
+    /* create one-to-many row lab3.model.Supplier.suppliedProducts */ update
+        products 
+    set
+        suppliedProducts_companyName=? 
+    where
+        productName=?
+Hibernate: 
+    /* create one-to-many row lab3.model.Supplier.suppliedProducts */ update
+        products 
+    set
+        suppliedProducts_companyName=? 
+    where
+        productName=?
+Hibernate: 
+    /* create one-to-many row lab3.model.Supplier.suppliedProducts */ update
+        products 
+    set
+        suppliedProducts_companyName=? 
+    where
+        productName=?
+Hibernate: 
+    /* create one-to-many row lab3.model.Supplier.suppliedProducts */ update
+        products 
+    set
+        suppliedProducts_companyName=? 
+    where
+        productName=?    
+    #+end_src
+*** Screeny
+[[./imgs/3a.png]]
+[[./imgs/3b.png]]
+[[./imgs/3c.png]]
+
 ** Dodawanie danych (oba przypadki)
    #+begin_src java
+public class App {
     public static void main(String[] args) {
+        addNewSupplier();
         Set<Product> products = addManyProducts();
-        Supplier s = addNewSupplier();
+
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Supplier supplier = session.get(Supplier.class, "Coca-Cola");
+
+            Transaction tx = session.beginTransaction();
+            for(Product product : products) {
+                supplier.addProduct(product);
+            }
+            session.update(supplier);
+            tx.commit();
+        }
+    }
+
+    private static void addNewSupplier() {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Transaction tx = session.beginTransaction();
-            for(Product p : products) {
-                s.getSuppliedProducts().add(p);
-            }
-            session.update(s);
+            Supplier supplier = new Supplier("Coca-Cola", "Jesionowa", "Warszawa");
+            session.save(supplier);
             tx.commit();
         }
     }
@@ -305,7 +639,8 @@ public class Product {
             tx.commit();
             return products;
         }
-    }   
+    }
+}  
    #+end_src
 * Relacja obustronna
 ** Definicja
@@ -317,10 +652,10 @@ public class Supplier {
     private String street;
     private String city;
 
-    @OneToMany
+    @OneToMany(mappedBy = "supplier")
     private Set<Product> suppliedProducts;
 
-    public Supplier() { }
+    public Supplier() {}
 
     public Supplier(String companyName, String street, String city) {
         this.companyName = companyName;
@@ -329,10 +664,11 @@ public class Supplier {
         this.suppliedProducts = new HashSet<>();
     }
 
-    public Set<Product> getSuppliedProducts() {
-        return suppliedProducts;
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
     }
 }
+
 @Entity(name="products")
 public class Product {
 
@@ -341,10 +677,10 @@ public class Product {
     private int unitsOnStock;
 
     @ManyToOne
+    @JoinColumn
     private Supplier supplier;
 
-    public Product() {
-    }
+    public Product() { }
 
     public Product(String productName, int unitsOnStock) {
         this.productName = productName;
@@ -356,21 +692,34 @@ public class Product {
         this.supplier = supplier;
     }
 }
-
    #+end_src
 ** Dodawanie danych
+   Trzeba pamiętać o updatowaniu po obu stronach relacji.
    #+begin_src java
+public class App {
     public static void main(String[] args) {
+        addNewSupplier();
         Set<Product> products = addManyProducts();
-        Supplier s = addNewSupplier();
+
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Supplier supplier = session.get(Supplier.class, "Coca-Cola");
+
+            Transaction tx = session.beginTransaction();
+            for(Product product : products) {
+                supplier.addProduct(product);
+                product.setSupplier(supplier);
+                session.update(product);
+            }
+            session.update(supplier);
+            tx.commit();
+        }
+    }
+
+    private static void addNewSupplier() {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Transaction tx = session.beginTransaction();
-            for(Product p : products) {
-                s.getSuppliedProducts().add(p);
-                p.setSupplier(s);
-                session.update(p);
-            }
-            session.update(s);
+            Supplier supplier = new Supplier("Coca-Cola", "Jesionowa", "Warszawa");
+            session.save(supplier);
             tx.commit();
         }
     }
@@ -390,14 +739,133 @@ public class Product {
             return products;
         }
     }
+}
+   #+end_src
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    /* insert lab3.model.Supplier
+        */ insert 
+        into
+            suppliers
+            (city, street, companyName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    select
+        supplier0_.companyName as companyN1_1_0_,
+        supplier0_.city as city2_1_0_,
+        supplier0_.street as street3_1_0_ 
+    from
+        suppliers supplier0_ 
+    where
+        supplier0_.companyName=?
+Hibernate: 
+    select
+        suppliedpr0_.supplier_companyName as supplier3_0_0_,
+        suppliedpr0_.productName as productN1_0_0_,
+        suppliedpr0_.productName as productN1_0_1_,
+        suppliedpr0_.supplier_companyName as supplier3_0_1_,
+        suppliedpr0_.unitsOnStock as unitsOnS2_0_1_ 
+    from
+        products suppliedpr0_ 
+    where
+        suppliedpr0_.supplier_companyName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?   
    #+end_src
 ** Screeny
 [[./imgs/5a.png]]
 [[./imgs/5b.png]]
 [[./imgs/5c.png]]
-[[./imgs/5d.png]]
-[[./imgs/5e.png]]
-[[./imgs/5f.png]]
+
 * Kategorie
 ** Definicja
    #+begin_src java
@@ -408,61 +876,87 @@ public class Category {
     private int categoryId;
     private String name;
 
-    @OneToMany
-    @JoinColumn
+    @OneToMany(mappedBy = "category")
     private List<Product> products;
+
+    public Category() {}
 
     public Category(String name) {
         this.name = name;
         this.products = new ArrayList<>();
     }
 
-    public Category() { }
+    public void addProduct(Product product) {
+        products.add(product);
+    }
 
     public List<Product> getProducts() {
         return products;
     }
 }
-   
-   #+end_src
-** Dodawanie danych
-   #+begin_src java
-    public static void main(String[] args) {
-        Supplier supplier = addNewSupplier();
-        List<Category> categories = addCategoriesWithProducts();
-        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
-            Transaction tx = session.beginTransaction();
-            for(Category cat : categories) {
-                for (Product product : cat.getProducts()) {
-                    product.setSupplier(supplier);
-                    supplier.getSuppliedProducts().add(product);
-                    session.update(product);
-                }
-            }
-            session.update(supplier);
-            tx.commit();
-        }
+
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    @ManyToOne
+    @JoinColumn
+    private Supplier supplier;
+
+    @ManyToOne
+    @JoinColumn
+    private Category category;
+
+    public Product() { }
+
+    public Product(String productName, int unitsOnStock) {
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
     }
 
-    private static List<Category> addCategoriesWithProducts() {
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
+    }
+    
+    public void setCategory(Category category) {
+        this.category = category;
+    }
+
+    public Category getCategory() {
+        return category;
+    }
+}
+   #+end_src
+
+** Dodawanie danych
+   #+begin_src java
+ublic class App {
+    public static void main(String[] args) {
+        addCategoriesWithProducts();
+    }
+    
+    private static void addCategoriesWithProducts() {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Transaction tx = session.beginTransaction();
             List<Category> categories = new ArrayList<>();
 
             Category cat1 = new Category("Picie");
-            cat1.getProducts().add(new Product("Kola", 21));
-            cat1.getProducts().add(new Product("Pepsi", 37));
-            cat1.getProducts().add(new Product("Fanta", 666));
+            cat1.addProduct(new Product("Kola", 21));
+            cat1.addProduct(new Product("Pepsi", 37));
+            cat1.addProduct(new Product("Fanta", 666));
 
             Category cat2 = new Category("Jedzenie");
-            cat2.getProducts().add(new Product("Czipsy", 10));
-            cat2.getProducts().add(new Product("Lizaki", 20));
-            cat2.getProducts().add(new Product("Ryby", 30));
+            cat2.addProduct(new Product("Czipsy", 10));
+            cat2.addProduct(new Product("Lizaki", 20));
+            cat2.addProduct(new Product("Ryby", 30));
 
             Category cat3 = new Category("Elektronika") ;
-            cat3.getProducts().add(new Product("MP3", 3));
-            cat3.getProducts().add(new Product("MP4", 4));
-            cat3.getProducts().add(new Product("MP5", 5));
+            cat3.addProduct(new Product("MP3", 3));
+            cat3.addProduct(new Product("MP4", 4));
+            cat3.addProduct(new Product("MP5", 5));
 
             categories.add(cat1);
             categories.add(cat2);
@@ -476,29 +970,284 @@ public class Category {
             }
 
             tx.commit();
-            return categories;
         }
     }
+}    
    #+end_src
-** Wydobywanie produktów z wybranej kategorii oraz kategorii do której należy wybrany produkt
-   #+begin_src java
-    private static Category getProductCategory(Product product) {
-        return product.getCategory();
-    }
 
-    private static List<Product> getProductsFromCategory(Category cat) {
-        return cat.getProducts();
-    }   
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Category
+        */ insert 
+        into
+            categories
+            (name, categoryId) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Category
+        */ insert 
+        into
+            categories
+            (name, categoryId) 
+        values
+            (?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Product
+        */ insert 
+        into
+            products
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+        values
+            (?, ?, ?, ?)
+Hibernate: 
+    /* insert lab3.model.Category
+        */ insert 
+        into
+            categories
+            (name, categoryId) 
+        values
+            (?, ?)
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?
+Hibernate: 
+    /* update
+        lab3.model.Product */ update
+            products 
+        set
+            category_categoryId=?,
+            supplier_companyName=?,
+            unitsOnStock=? 
+        where
+            productName=?   
    #+end_src
+
 ** Screeny
 [[./imgs/6a.png]]
 [[./imgs/6b.png]]
 [[./imgs/6c.png]]
 [[./imgs/6d.png]]
-[[./imgs/6e.png]]
-[[./imgs/6f.png]]
-[[./imgs/6g.png]]
-[[./imgs/6h.png]]
+
+** Wydobywanie produktów z po nazwie kategorii oraz kategorii po nazwie produktu
+   Dwie metody relaizujące zadaną funkcjonalność.
+   #+begin_src java
+    private static List<Product> getProductsByCategoryName(String categoryName) {
+        List<Product> results = new ArrayList<>();
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Query query = session.createQuery("select p from products p" +
+                                              " inner join categories c on c = p.category" +
+                                              " where c.name = :catName");
+            query.setParameter("catName", categoryName);
+
+            for(Object o : query.getResultList()) {
+                results.add((Product) o);
+            }
+        }
+        return results;
+    }
+
+    private static Category getCategoryByProductName(String productName) {
+        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
+            Product product = session.get(Product.class, productName);
+            if (product != null) {
+                return product.getCategory();
+            }
+        }
+        return null;
+    }   
+   #+end_src
+
 * Relacja wiele-do-wiele
 ** Definicja
    #+begin_src java
@@ -509,20 +1258,18 @@ public class Invoice {
     private int invoiceNumber;
     private int quantity;
 
-    @ManyToMany
+    @ManyToMany(mappedBy = "invoices")
     private Set<Product> products;
 
     public Invoice() {
         this.products = new HashSet<>();
+        this.quantity = 0;
     }
 
-    public Invoice(int quantity) {
-        this();
-        this.quantity = quantity;
-    }
-
-    public Set<Product> getProducts() {
-        return products;
+    public void addProduct(Product product) {
+        this.products.add(product);
+        product.getInvoices().add(this);
+        this.quantity = this.products.size();
     }
 }
 
@@ -534,9 +1281,11 @@ public class Product {
     private int unitsOnStock;
 
     @ManyToOne
+    @JoinColumn
     private Supplier supplier;
 
     @ManyToOne
+    @JoinColumn
     private Category category;
 
     @ManyToMany
@@ -544,8 +1293,6 @@ public class Product {
 
     public Product() {
         this.invoices = new HashSet<>();
-        this.supplier = null;
-        this.category = null;
     }
 
     public Product(String productName, int unitsOnStock) {
@@ -554,25 +1301,26 @@ public class Product {
         this.unitsOnStock = unitsOnStock;
     }
 
-    public void setSupplier(Supplier supplier) {
-        this.supplier = supplier;
+    public Set<Invoice> getInvoices() {
+        return invoices;
     }
 
-    public Category getCategory() {
-        return category;
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
     }
 
     public void setCategory(Category category) {
         this.category = category;
     }
 
-    public Set<Invoice> getInvoices() {
-        return invoices;
+    public Category getCategory() {
+        return category;
     }
-}   
+} 
    #+end_src
 ** Dodawanie do bazy
    #+begin_src java
+public class App {
     public static void main(String[] args) {
         try (Session session = HibernateUtils.getSessionFactory().openSession()) {
             Transaction tx = session.beginTransaction();
@@ -582,20 +1330,15 @@ public class Product {
             Product p3 = new Product("Ryby", 5);
             Product p4 = new Product("Klocki", 5);
 
-            Invoice i1 = new Invoice(2);
-            Invoice i2 = new Invoice(3);
+            Invoice i1 = new Invoice();
+            Invoice i2 = new Invoice();
 
-            i1.getProducts().add(p1);
-            p1.getInvoices().add(i1);
-            i1.getProducts().add(p2);
-            p2.getInvoices().add(i1);
-            i1.getProducts().add(p3);
-            p3.getInvoices().add(i1);
+            i1.addProduct(p1);
+            i1.addProduct(p2);
+            i1.addProduct(p3);
 
-            i2.getProducts().add(p2);
-            p2.getInvoices().add(i2);
-            i2.getProducts().add(p4);
-            p2.getInvoices().add(i2);
+            i2.addProduct(p2);
+            i2.addProduct(p4);
 
             session.save(p1);
             session.save(p2);
@@ -606,45 +1349,27 @@ public class Product {
 
             tx.commit();
         }
-    }   
+    }
+} 
    #+end_src
-** Screeny 
-[[./imgs/7a.png]]
-[[./imgs/7b.png]]
-[[./imgs/7c.png]]
-[[./imgs/7d.png]]
-[[./imgs/7e.png]]
 ** Logi
    #+begin_src 
-Hibernate:
-
+Hibernate: 
+    
     create table categories (
        categoryId integer not null,
         name varchar(255),
         primary key (categoryId)
     )
-Hibernate:
-
-    create table categories_products (
-       categories_categoryId integer not null,
-        products_productName varchar(255) not null
-    )
-Hibernate:
-
+Hibernate: 
+    
     create table invoices (
        invoiceNumber integer not null,
         quantity integer not null,
         primary key (invoiceNumber)
     )
-Hibernate:
-
-    create table invoices_products (
-       invoices_invoiceNumber integer not null,
-        products_productName varchar(255) not null,
-        primary key (invoices_invoiceNumber, products_productName)
-    )
-Hibernate:
-
+Hibernate: 
+    
     create table products (
        productName varchar(255) not null,
         unitsOnStock integer not null,
@@ -652,225 +1377,149 @@ Hibernate:
         supplier_companyName varchar(255),
         primary key (productName)
     )
-Hibernate:
-
+Hibernate: 
+    
     create table products_invoices (
        products_productName varchar(255) not null,
         invoices_invoiceNumber integer not null,
         primary key (products_productName, invoices_invoiceNumber)
     )
-Hibernate:
-
+Hibernate: 
+    
     create table suppliers (
        companyName varchar(255) not null,
         city varchar(255),
         street varchar(255),
         primary key (companyName)
     )
-Hibernate:
-
-    create table suppliers_products (
-       suppliers_companyName varchar(255) not null,
-        suppliedProducts_productName varchar(255) not null,
-        primary key (suppliers_companyName, suppliedProducts_productName)
-    )
-Hibernate:
-
-    alter table categories_products
-       add constraint UK_e7p6od1yxp6s6prnjrnkwh1lg unique (products_productName)
-Hibernate:
-
-    alter table suppliers_products
-       add constraint UK_c856gagly0f0xv1n05lejog7j unique (suppliedProducts_productName)
-Hibernate:
-
-    alter table categories_products
-       add constraint FKtfom8iqgvch9acnd61recbfk0
-       foreign key (products_productName)
-       references products
-Hibernate:
-
-    alter table categories_products
-       add constraint FKsg6yecsm576qfwq5f7v8sr3ho
-       foreign key (categories_categoryId)
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
        references categories
-Hibernate:
-
-    alter table invoices_products
-       add constraint FK64itqr5js0tvv3x15m7thoqoh
-       foreign key (products_productName)
-       references products
-Hibernate:
-
-    alter table invoices_products
-       add constraint FKg6v0msu0o5kvkwyp0j8hpnrqc
-       foreign key (invoices_invoiceNumber)
-       references invoices
-Hibernate:
-
-    alter table products
-       add constraint FK39q5abaso5mmwgaslrltaxa0c
-       foreign key (category_categoryId)
-       references categories
-Hibernate:
-
-    alter table products
-       add constraint FK6u1jre85l46o98fl81tbndqdl
-       foreign key (supplier_companyName)
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
        references suppliers
-Hibernate:
-
-    alter table products_invoices
-       add constraint FK188akj3woqp8b2n19q3akqbmi
-       foreign key (invoices_invoiceNumber)
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
        references invoices
-Hibernate:
-
-    alter table products_invoices
-       add constraint FKt2ypyvvhgbga8u3qyibb578ma
-       foreign key (products_productName)
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
        references products
-Hibernate:
-
-    alter table suppliers_products
-       add constraint FKqqodc7m7xno62tb9sd7aopo52
-       foreign key (suppliedProducts_productName)
-       references products
-Hibernate:
-
-    alter table suppliers_products
-       add constraint FKl0xw81c7omyx9xy9rgt38gxc9
-       foreign key (suppliers_companyName)
-       references suppliers
-Hibernate:
-
+Hibernate: 
+    
 values
     next value for hibernate_sequence
-Hibernate:
-
+Hibernate: 
+    
 values
     next value for hibernate_sequence
-Hibernate:
+Hibernate: 
     /* insert lab3.model.Product
-        */ insert
+        */ insert 
         into
             products
-            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
         values
             (?, ?, ?, ?)
-Hibernate:
+Hibernate: 
     /* insert lab3.model.Product
-        */ insert
+        */ insert 
         into
             products
-            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
         values
             (?, ?, ?, ?)
-Hibernate:
+Hibernate: 
     /* insert lab3.model.Product
-        */ insert
+        */ insert 
         into
             products
-            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
         values
             (?, ?, ?, ?)
-Hibernate:
+Hibernate: 
     /* insert lab3.model.Product
-        */ insert
+        */ insert 
         into
             products
-            (category_categoryId, supplier_companyName, unitsOnStock, productName)
+            (category_categoryId, supplier_companyName, unitsOnStock, productName) 
         values
             (?, ?, ?, ?)
-Hibernate:
+Hibernate: 
     /* insert lab3.model.Invoice
-        */ insert
+        */ insert 
         into
             invoices
-            (quantity, invoiceNumber)
+            (quantity, invoiceNumber) 
         values
             (?, ?)
-Hibernate:
+Hibernate: 
     /* insert lab3.model.Invoice
-        */ insert
+        */ insert 
         into
             invoices
-            (quantity, invoiceNumber)
+            (quantity, invoiceNumber) 
         values
             (?, ?)
-Hibernate:
+Hibernate: 
     /* insert collection
-        row lab3.model.Product.invoices */ insert
+        row lab3.model.Product.invoices */ insert 
         into
             products_invoices
-            (products_productName, invoices_invoiceNumber)
+            (products_productName, invoices_invoiceNumber) 
         values
             (?, ?)
-Hibernate:
+Hibernate: 
     /* insert collection
-        row lab3.model.Product.invoices */ insert
+        row lab3.model.Product.invoices */ insert 
         into
             products_invoices
-            (products_productName, invoices_invoiceNumber)
+            (products_productName, invoices_invoiceNumber) 
         values
             (?, ?)
-Hibernate:
+Hibernate: 
     /* insert collection
-        row lab3.model.Product.invoices */ insert
+        row lab3.model.Product.invoices */ insert 
         into
             products_invoices
-            (products_productName, invoices_invoiceNumber)
+            (products_productName, invoices_invoiceNumber) 
         values
             (?, ?)
-Hibernate:
+Hibernate: 
     /* insert collection
-        row lab3.model.Product.invoices */ insert
+        row lab3.model.Product.invoices */ insert 
         into
             products_invoices
-            (products_productName, invoices_invoiceNumber)
+            (products_productName, invoices_invoiceNumber) 
         values
             (?, ?)
-Hibernate:
+Hibernate: 
     /* insert collection
-        row lab3.model.Invoice.products */ insert
+        row lab3.model.Product.invoices */ insert 
         into
-            invoices_products
-            (invoices_invoiceNumber, products_productName)
-        values
-            (?, ?)
-Hibernate:
-    /* insert collection
-        row lab3.model.Invoice.products */ insert
-        into
-            invoices_products
-            (invoices_invoiceNumber, products_productName)
-        values
-            (?, ?)
-Hibernate:
-    /* insert collection
-        row lab3.model.Invoice.products */ insert
-        into
-            invoices_products
-            (invoices_invoiceNumber, products_productName)
-        values
-            (?, ?)
-Hibernate:
-    /* insert collection
-        row lab3.model.Invoice.products */ insert
-        into
-            invoices_products
-            (invoices_invoiceNumber, products_productName)
-        values
-            (?, ?)
-Hibernate:
-    /* insert collection
-        row lab3.model.Invoice.products */ insert
-        into
-            invoices_products
-            (invoices_invoiceNumber, products_productName)
+            products_invoices
+            (products_productName, invoices_invoiceNumber) 
         values
             (?, ?)   
    #+end_src
+
+** Screeny 
+[[./imgs/7a.png]]
+[[./imgs/7b.png]]
+[[./imgs/7c.png]]
+[[./imgs/7d.png]]
+
 * JPA
 * Kaskady
 * Embedded class

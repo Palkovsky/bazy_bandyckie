@@ -11,19 +11,17 @@ public class Invoice {
     private int invoiceNumber;
     private int quantity;
 
-    @ManyToMany
+    @ManyToMany(mappedBy = "invoices")
     private Set<Product> products;
 
     public Invoice() {
         this.products = new HashSet<>();
+        this.quantity = 0;
     }
 
-    public Invoice(int quantity) {
-        this();
-        this.quantity = quantity;
-    }
-
-    public Set<Product> getProducts() {
-        return products;
+    public void addProduct(Product product) {
+        this.products.add(product);
+        product.getInvoices().add(this);
+        this.quantity = this.products.size();
     }
 }

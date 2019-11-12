@@ -2,7 +2,6 @@ package lab3.model;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
-import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import java.util.HashSet;
 import java.util.Set;
@@ -14,10 +13,10 @@ public class Supplier {
     private String street;
     private String city;
 
-    @OneToMany
+    @OneToMany(mappedBy = "supplier")
     private Set<Product> suppliedProducts;
 
-    public Supplier() { }
+    public Supplier() {}
 
     public Supplier(String companyName, String street, String city) {
         this.companyName = companyName;
@@ -26,7 +25,7 @@ public class Supplier {
         this.suppliedProducts = new HashSet<>();
     }
 
-    public Set<Product> getSuppliedProducts() {
-        return suppliedProducts;
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
     }
 }

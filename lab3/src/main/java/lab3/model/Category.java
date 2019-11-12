@@ -11,15 +11,19 @@ public class Category {
     private int categoryId;
     private String name;
 
-    @OneToMany
+    @OneToMany(mappedBy = "category")
     private List<Product> products;
+
+    public Category() {}
 
     public Category(String name) {
         this.name = name;
         this.products = new ArrayList<>();
     }
 
-    public Category() { }
+    public void addProduct(Product product) {
+        products.add(product);
+    }
 
     public List<Product> getProducts() {
         return products;
