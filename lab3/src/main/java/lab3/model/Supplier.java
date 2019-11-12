@@ -1,27 +1,23 @@
 package lab3.model;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
+import javax.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity(name="suppliers")
-public class Supplier {
-    @Id
-    private String companyName;
-    private String street;
-    private String city;
+public class Supplier extends Company{
+    private String bankAccountNumber;
 
     @OneToMany(mappedBy = "supplier")
     private Set<Product> suppliedProducts;
 
-    public Supplier() {}
+    public Supplier() {
+        super();
+    }
 
-    public Supplier(String companyName, String street, String city) {
-        this.companyName = companyName;
-        this.street = street;
-        this.city = city;
+    public Supplier(String companyName, String bankAccountNumber, String street, String city, String zip) {
+        super(companyName, street, city, zip);
+        this.bankAccountNumber = bankAccountNumber;
         this.suppliedProducts = new HashSet<>();
     }
 

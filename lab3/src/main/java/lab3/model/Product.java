@@ -19,7 +19,7 @@ public class Product {
     @JoinColumn
     private Category category;
 
-    @ManyToMany
+    @ManyToMany(cascade = {CascadeType.PERSIST})
     private Set<Invoice> invoices;
 
     public Product() {

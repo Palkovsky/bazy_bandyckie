@@ -29,10 +29,6 @@
     public static SessionFactory getSessionFactory() {
         return sessionFactory;
     }
-
-    public static void shutdown() {
-        getSessionFactory().close();
-    }
 }
   #+end_src
 
@@ -933,7 +929,7 @@ public class Product {
 
 ** Dodawanie danych
    #+begin_src java
-ublic class App {
+public class App {
     public static void main(String[] args) {
         addCategoriesWithProducts();
     }
@@ -1521,6 +1517,1270 @@ Hibernate:
 [[./imgs/7d.png]]
 
 * JPA
+** JPA Factory
+   Pomocnicza klasa podobna do Session Facotory.
+   #+begin_src java
+public class JPAUtils {
+
+    private static final EntityManagerFactory emf;
+
+    private JPAUtils() {}
+
+    static {
+        try {
+            emf = Persistence.createEntityManagerFactory("myDatabaseConfig");
+        } catch (Throwable ex) {
+            System.err.println("Initial SessionFactory creation failed." + ex);
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    public static EntityManagerFactory getEntityManagerFactory() {
+        return emf;
+    }
+}   
+   #+end_src
+** persistence.xml
+   #+begin_src xml
+<persistence xmlns="http://java.sun.com/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://java.sun.com/xml/ns/persistence
+http://java.sun.com/xml/ns/persistence/persistence_2_0.xsd"
+             version="2.0">
+    <persistence-unit name="myDatabaseConfig"
+                      transaction-type="RESOURCE_LOCAL">
+
+        <class>lab3.model.Product</class>
+        <class>lab3.model.Supplier</class>
+        <class>lab3.model.Category</class>
+        <class>lab3.model.Invoice</class>
+
+        <properties>
+            <property name="hibernate.connection.driver_class"
+                      value="org.apache.derby.jdbc.ClientDriver"/>
+            <property name="hibernate.connection.url"
+                      value="jdbc:derby://localhost:1527/DMacekDB;create=true"/>
+            <property name="hibernate.dialect"
+                      value="org.hibernate.dialect.DerbyDialect"/>
+            <property name="hibernate.show_sql" value="true" />
+            <property name="hibernate.format_sql" value="true" />
+            <property name="hibernate.hbm2ddl.auto" value="create" />
+        </properties>
+    </persistence-unit>
+</persistence>   
+   #+end_src
+** Kod
+   #+begin_src java
+public class App {
+    public static void main(String[] args) {
+        addCategoriesWithProducts();
+    }
+
+    private static void addCategoriesWithProducts() {
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+        List<Category> categories = new ArrayList<>();
+
+        Category cat1 = new Category("Picie");
+        cat1.addProduct(new Product("Kola", 21));
+        cat1.addProduct(new Product("Pepsi", 37));
+        cat1.addProduct(new Product("Fanta", 666));
+
+        Category cat2 = new Category("Jedzenie");
+        cat2.addProduct(new Product("Czipsy", 10));
+        cat2.addProduct(new Product("Lizaki", 20));
+        cat2.addProduct(new Product("Ryby", 30));
+
+        Category cat3 = new Category("Elektronika") ;
+        cat3.addProduct(new Product("MP3", 3));
+        cat3.addProduct(new Product("MP4", 4));
+        cat3.addProduct(new Product("MP5", 5));
+
+        categories.add(cat1);
+        categories.add(cat2);
+        categories.add(cat3);
+
+        EntityTransaction etx = em.getTransaction();
+        etx.begin();
+
+        for(Category cat : categories) {
+            for(Product product : cat.getProducts()) {
+                product.setCategory(cat);
+                em.persist(product);
+            }
+            em.persist(cat);
+        }
+
+        etx.commit();
+        em.close();
+    }
+}   
+   #+end_src
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        categories
+        (name, categoryId) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        categories
+        (name, categoryId) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        categories
+        (name, categoryId) 
+    values
+        (?, ?)
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?
+Hibernate: 
+    update
+        products 
+    set
+        category_categoryId=?,
+        supplier_companyName=?,
+        unitsOnStock=? 
+    where
+        productName=?   
+   #+end_src
+** Screeny
+[[./imgs/8a.png]]
+[[./imgs/8b.png]]
+[[./imgs/8b.png]]
 * Kaskady
+** Definicja
+   #+begin_src java
+@Entity(name="products")
+public class Product {
+
+    @Id
+    private String productName;
+    private int unitsOnStock;
+
+    @ManyToOne
+    @JoinColumn
+    private Supplier supplier;
+
+    @ManyToOne
+    @JoinColumn
+    private Category category;
+
+    @ManyToMany(cascade = {CascadeType.PERSIST})
+    private Set<Invoice> invoices;
+
+    public Product() {
+        this.invoices = new HashSet<>();
+    }
+
+    public Product(String productName, int unitsOnStock) {
+        this();
+        this.productName = productName;
+        this.unitsOnStock = unitsOnStock;
+    }
+
+    public Set<Invoice> getInvoices() {
+        return invoices;
+    }
+
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
+    }
+
+    public void setCategory(Category category) {
+        this.category = category;
+    }
+
+    public Category getCategory() {
+        return category;
+    }
+}
+
+@Entity(name="invoices")
+public class Invoice {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private int invoiceNumber;
+    private int quantity;
+
+    @ManyToMany(mappedBy = "invoices", cascade = {CascadeType.PERSIST})
+    private Set<Product> products;
+
+    public Invoice() {
+        this.products = new HashSet<>();
+        this.quantity = 0;
+    }
+
+    public Invoice(int quantity) {
+        this();
+        this.quantity = quantity;
+    }
+
+    public void addProduct(Product product) {
+        this.products.add(product);
+        product.getInvoices().add(this);
+        this.quantity = this.products.size();
+    }
+}
+   #+end_src
+
+** Dodawanie danych
+   #+begin_src java
+public class App {
+    public static void main(String[] args) {
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+
+        Product p1 = new Product("Czipsy", 100);
+        Product p2 = new Product("Kola", 10);
+        Product p3 = new Product("Ryby", 5);
+
+        Invoice i1 = new Invoice();
+        i1.addProduct(p1);
+        i1.addProduct(p2);
+        i1.addProduct(p3);
+
+        Invoice i2 = new Invoice();
+        Invoice i3 = new Invoice();
+        Product p4 = new Product("Klocki", 5);
+        i2.addProduct(p4);
+        i3.addProduct(p4);
+
+        EntityTransaction etx = em.getTransaction();
+        etx.begin();
+        em.persist(i1);
+        em.persist(p4);
+        etx.commit();
+        em.close();
+
+    }
+}   
+   #+end_src
+
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    
+values
+    next value for hibernate_sequence
+Hibernate: 
+    insert 
+    into
+        invoices
+        (quantity, invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        products
+        (category_categoryId, supplier_companyName, unitsOnStock, productName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        invoices
+        (quantity, invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        invoices
+        (quantity, invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products_invoices
+        (products_productName, invoices_invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products_invoices
+        (products_productName, invoices_invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products_invoices
+        (products_productName, invoices_invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products_invoices
+        (products_productName, invoices_invoiceNumber) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        products_invoices
+        (products_productName, invoices_invoiceNumber) 
+    values
+        (?, ?)   
+   #+end_src
+
+** Screeny
+[[./imgs/9a.png]]
+[[./imgs/9b.png]]
+[[./imgs/9c.png]]
+[[./imgs/9d.png]]
+
 * Embedded class
+** Definicja
+   #+begin_src java
+@Entity(name="suppliers")
+public class Supplier {
+    @Id
+    private String companyName;
+
+    @Embedded
+    private Address address;
+
+    @OneToMany(mappedBy = "supplier")
+    private Set<Product> suppliedProducts;
+
+    public Supplier() {}
+
+    public Supplier(String companyName, String street, String city, String zip) {
+        this.companyName = companyName;
+        this.address = new Address(street, city, zip);
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
+    }
+}
+
+@Embeddable
+public class Address {
+    private String string;
+    private String city;
+    private String zipCode;
+
+    public Address() { }
+
+    public Address(String string, String city, String zipCode) {
+        this.string = string;
+        this.city = city;
+        this.zipCode = zipCode;
+    }
+}
+   #+end_src
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        string varchar(255),
+        zipCode varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products   
+   #+end_src
+
+** Screeny
+[[./imgs/10a.png]]
+
+* Podział pól na dwie tabele
+** Definicja
+   #+begin_src java
+@Entity(name="suppliers")
+@SecondaryTable(name="addresses")
+public class Supplier {
+    @Id
+    private String companyName;
+    @Column(table = "addresses")
+    private String street;
+    @Column(table = "addresses")
+    private String city;
+    @Column(table = "addresses")
+    private String zipCode;
+
+    @OneToMany(mappedBy = "supplier")
+    private Set<Product> suppliedProducts;
+
+    public Supplier() {}
+
+    public Supplier(String companyName, String street, String city, String zip) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+        this.zipCode = zip;
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
+    }
+}   
+   #+end_src
+** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table addresses (
+       city varchar(255),
+        street varchar(255),
+        zipCode varchar(255),
+        companyName varchar(255) not null,
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table addresses 
+       add constraint FKbf3nem498ggke634c4xpu3p0i 
+       foreign key (companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products   
+   #+end_src
+
+** Screeny
+[[./imgs/11a.png]]
 * Dziedziczenie
+** Definicja
+   W każdym z przypadków będziemy zmieniać tylko strategię.
+   #+begin_src java
+@Entity(name = "companies")
+@Inheritance(strategy= InheritanceType.JOINED)
+public abstract class Company {
+    @Id
+    private String companyName;
+    private String street;
+    private String city;
+    private String zipCode;
+
+    public Company() { }
+
+    public Company(String companyName, String street, String city, String zipCode) {
+        this.companyName = companyName;
+        this.street = street;
+        this.city = city;
+        this.zipCode = zipCode;
+    }
+}   
+
+@Entity(name="suppliers")
+public class Supplier extends Company{
+    private String bankAccountNumber;
+
+    @OneToMany(mappedBy = "supplier")
+    private Set<Product> suppliedProducts;
+
+    public Supplier() {
+        super();
+    }
+
+    public Supplier(String companyName, String bankAccountNumber, String street, String city, String zip) {
+        super(companyName, street, city, zip);
+        this.bankAccountNumber = bankAccountNumber;
+        this.suppliedProducts = new HashSet<>();
+    }
+
+    public void addProduct(Product product) {
+        suppliedProducts.add(product);
+    }
+}
+
+@Entity(name = "customers")
+public class Customer extends Company {
+    private int discount;
+
+    public Customer() {
+        super();
+        this.discount = 0;
+    }
+
+    public Customer(String companyName, int discount, String street, String city, String zipCode) {
+        super(companyName, street, city, zipCode);
+        this.discount = discount;
+    }
+}
+   #+end_src
+** Dodawanie danych
+   #+begin_src java
+public class App {
+    public static void main(String[] args) {
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+
+        Customer c1 = new Customer("Januszpol", 100, "Jesionowa", "Białystok", "12-345");
+        Customer c2 = new Customer("Biuro Interwencji Obywatelskich", 0, "Szkolna", "Białystok", "12-345");
+        Supplier s1 = new Supplier("Coca-Cola", "1234 5678 9012 3456", "Krótka", "Warszawa", "21-376");
+
+        EntityTransaction etx = em.getTransaction();
+        etx.begin();
+        em.persist(c1);
+        em.persist(c2);
+        em.persist(s1);
+        etx.commit();
+        em.close();
+    }
+}   
+   #+end_src
+
+** Jedna tabela - InheritanceType.SINGLE​_TABLE
+*** Logi
+    #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table companies (
+       DTYPE varchar(31) not null,
+        companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        zipCode varchar(255),
+        bankAccountNumber varchar(255),
+        discount integer,
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FKfkxq9id9b1d3p2gf2qum02kll 
+       foreign key (supplier_companyName) 
+       references companies
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products
+Hibernate: 
+
+    insert 
+    into
+        companies
+        (city, street, zipCode, discount, DTYPE, companyName) 
+    values
+        (?, ?, ?, ?, 'customers', ?)
+Hibernate: 
+    insert 
+    into
+        companies
+        (city, street, zipCode, discount, DTYPE, companyName) 
+    values
+        (?, ?, ?, ?, 'customers', ?)
+Hibernate: 
+    insert 
+    into
+        companies
+        (city, street, zipCode, bankAccountNumber, DTYPE, companyName) 
+    values
+        (?, ?, ?, ?, 'suppliers', ?)    
+    #+end_src
+*** Screeny
+[[./imgs/12a.png]]
+[[./imgs/12b.png]]
+
+** Tabele łączone - InheritanceType.JOINED
+*** Logi
+   #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table companies (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        zipCode varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    create table customers (
+       discount integer not null,
+        companyName varchar(255) not null,
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       bankAccountNumber varchar(255),
+        companyName varchar(255) not null,
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table customers 
+       add constraint FK1v3hmf41hltfsnwikc2v9wy13 
+       foreign key (companyName) 
+       references companies
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products
+Hibernate: 
+    
+    alter table suppliers 
+       add constraint FK526hn76520hhwimww7s4obh5o 
+       foreign key (companyName) 
+       references companies
+Hibernate: 
+    insert 
+    into
+        companies
+        (city, street, zipCode, companyName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        customers
+        (discount, companyName) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        companies
+        (city, street, zipCode, companyName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        customers
+        (discount, companyName) 
+    values
+        (?, ?)
+Hibernate: 
+    insert 
+    into
+        companies
+        (city, street, zipCode, companyName) 
+    values
+        (?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        suppliers
+        (bankAccountNumber, companyName) 
+    values
+        (?, ?)   
+   #+end_src
+*** Screeny
+[[./imgs/13a.png]]
+[[./imgs/13b.png]]
+[[./imgs/13c.png]]
+[[./imgs/13d.png]]
+** Odzielne tabele - InheritanceType.TABLE​_PER​_CLASS
+*** Logi
+    #+begin_src 
+Hibernate: 
+    
+    create table categories (
+       categoryId integer not null,
+        name varchar(255),
+        primary key (categoryId)
+    )
+Hibernate: 
+    
+    create table customers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        zipCode varchar(255),
+        discount integer not null,
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    create table invoices (
+       invoiceNumber integer not null,
+        quantity integer not null,
+        primary key (invoiceNumber)
+    )
+Hibernate: 
+    
+    create table products (
+       productName varchar(255) not null,
+        unitsOnStock integer not null,
+        category_categoryId integer,
+        supplier_companyName varchar(255),
+        primary key (productName)
+    )
+Hibernate: 
+    
+    create table products_invoices (
+       products_productName varchar(255) not null,
+        invoices_invoiceNumber integer not null,
+        primary key (products_productName, invoices_invoiceNumber)
+    )
+Hibernate: 
+    
+    create table suppliers (
+       companyName varchar(255) not null,
+        city varchar(255),
+        street varchar(255),
+        zipCode varchar(255),
+        bankAccountNumber varchar(255),
+        primary key (companyName)
+    )
+Hibernate: 
+    
+    alter table products 
+       add constraint FK39q5abaso5mmwgaslrltaxa0c 
+       foreign key (category_categoryId) 
+       references categories
+Hibernate: 
+    
+    alter table products 
+       add constraint FK6u1jre85l46o98fl81tbndqdl 
+       foreign key (supplier_companyName) 
+       references suppliers
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FK188akj3woqp8b2n19q3akqbmi 
+       foreign key (invoices_invoiceNumber) 
+       references invoices
+Hibernate: 
+    
+    alter table products_invoices 
+       add constraint FKt2ypyvvhgbga8u3qyibb578ma 
+       foreign key (products_productName) 
+       references products
+Hibernate: 
+
+    insert 
+    into
+        customers
+        (city, street, zipCode, discount, companyName) 
+    values
+        (?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        customers
+        (city, street, zipCode, discount, companyName) 
+    values
+        (?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        suppliers
+        (city, street, zipCode, bankAccountNumber, companyName) 
+    values
+        (?, ?, ?, ?, ?)    
+    #+end_src
+*** Screeny
+[[./imgs/14a.png]]
+[[./imgs/14b.png]]
+[[./imgs/14c.png]]

@@ -11,12 +11,17 @@ public class Invoice {
     private int invoiceNumber;
     private int quantity;
 
-    @ManyToMany(mappedBy = "invoices")
+    @ManyToMany(mappedBy = "invoices", cascade = {CascadeType.PERSIST})
     private Set<Product> products;
 
     public Invoice() {
         this.products = new HashSet<>();
         this.quantity = 0;
+    }
+
+    public Invoice(int quantity) {
+        this();
+        this.quantity = quantity;
     }
 
     public void addProduct(Product product) {

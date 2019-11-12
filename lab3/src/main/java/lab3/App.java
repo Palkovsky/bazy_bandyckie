@@ -1,40 +1,25 @@
 package lab3;
 
+import lab3.model.Customer;
+import lab3.model.Supplier;
 
-import lab3.model.Invoice;
-import lab3.model.Product;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
-
+import javax.persistence.EntityManager;
+import javax.persistence.EntityTransaction;
 
 public class App {
     public static void main(String[] args) {
-        try (Session session = HibernateUtils.getSessionFactory().openSession()) {
-            Transaction tx = session.beginTransaction();
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
 
-            Product p1 = new Product("Czipsy", 100);
-            Product p2 = new Product("Kola", 10);
-            Product p3 = new Product("Ryby", 5);
-            Product p4 = new Product("Klocki", 5);
+        Customer c1 = new Customer("Januszpol", 100, "Jesionowa", "Białystok", "12-345");
+        Customer c2 = new Customer("Biuro Interwencji Obywatelskich", 0, "Szkolna", "Białystok", "12-345");
+        Supplier s1 = new Supplier("Coca-Cola", "1234 5678 9012 3456", "Krótka", "Warszawa", "21-376");
 
-            Invoice i1 = new Invoice();
-            Invoice i2 = new Invoice();
-
-            i1.addProduct(p1);
-            i1.addProduct(p2);
-            i1.addProduct(p3);
-
-            i2.addProduct(p2);
-            i2.addProduct(p4);
-
-            session.save(p1);
-            session.save(p2);
-            session.save(p3);
-            session.save(p4);
-            session.save(i1);
-            session.save(i2);
-
-            tx.commit();
-        }
+        EntityTransaction etx = em.getTransaction();
+        etx.begin();
+        em.persist(c1);
+        em.persist(c2);
+        em.persist(s1);
+        etx.commit();
+        em.close();
     }
 }
