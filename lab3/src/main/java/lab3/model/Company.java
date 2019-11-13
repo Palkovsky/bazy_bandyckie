@@ -6,7 +6,7 @@ import javax.persistence.Inheritance;
 import javax.persistence.InheritanceType;
 
 @Entity(name = "companies")
-@Inheritance(strategy= InheritanceType.TABLE_PER_CLASS)
+@Inheritance(strategy= InheritanceType.JOINED)
 public abstract class Company {
     @Id
     private String companyName;

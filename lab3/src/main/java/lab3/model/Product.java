@@ -47,4 +47,16 @@ public class Product {
     public Category getCategory() {
         return category;
     }
+
+    public int getUnitsOnStock() {
+        return unitsOnStock;
+    }
+
+    public void setUnitsOnStock(int unitsOnStock) {
+        this.unitsOnStock = unitsOnStock;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
 }
