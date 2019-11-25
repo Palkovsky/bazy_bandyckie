@@ -43,4 +43,12 @@ public class BatchOrder {
         singleOrders.add(singleOrder);
         product.setUnitsOnStock(product.getUnitsOnStock() - quantity);
     }
+
+    public int getId() {
+        return orderId;
+    }
+
+    public Set<SingleOrder> getSingleOrders() {
+        return singleOrders;
+    }
 }

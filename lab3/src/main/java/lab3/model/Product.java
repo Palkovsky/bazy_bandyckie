@@ -3,6 +3,7 @@ package lab3.model;
 import javax.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity(name="products")
 public class Product {
@@ -66,5 +67,11 @@ public class Product {
 
     public Set<SingleOrder> getOrders() {
         return orders;
+    }
+
+    public static Set<Product> getAvailableProducts(EntityManager em) {
+        TypedQuery<Product> query =
+                em.createQuery("SELECT p FROM products p WHERE p.unitsOnStock > 0", Product.class);
+        return query.getResultStream().collect(Collectors.toSet());
     }
 }

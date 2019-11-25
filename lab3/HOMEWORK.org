@@ -274,7 +274,7 @@ public class SingleOrder {
   Szkielet kodu wygląda następująco.
 
   #+begin_src java
-    private static Object supplierMode(String companyName) throws IOException {
+    private static void supplierMode(String companyName) throws IOException {
         BufferedReader reader =
                 new BufferedReader(new InputStreamReader(System.in));
         Scanner scanner =
@@ -307,7 +307,7 @@ public class SingleOrder {
             case "quit":
             case "q":
                 em.close();
-                return null;
+                return;
             default:
                 lines("Unrecognized command.",
                         "Type 'help' to check available commands.");
@@ -315,7 +315,7 @@ public class SingleOrder {
         }
 
         em.close();
-        return supplierMode(companyName);
+        supplierMode(companyName);
     }  
   #+end_src
   [[./imgs/h2.png]]
@@ -475,3 +475,122 @@ public class SingleOrder {
 [[./imgs/h6.png]]
 [[./imgs/h7.png]]
 * Wersja dla klientów
+  Szkielet dla wersji dla klientów jest podobny do tego z wersji dla dostawców.
+
+  #+begin_src java
+    private static void customerMode(String companyName) throws IOException {
+        BufferedReader reader =
+                new BufferedReader(new InputStreamReader(System.in));
+        Scanner scanner =
+                new Scanner(reader);
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+        EntityTransaction etx;
+        Customer customer = em.find(Customer.class, companyName);
+
+        switch (reader.readLine()) {
+            case "?":
+            case "help":
+                lines(
+                        "?/help - displays this message",
+                        "whoami - info about current user",
+                        "lsprod - lists all available products",
+                        "lsord - lists all orders made by this user and their statuses",
+                        "cartls - list current cart contents",
+                        "cartadd - adding new product to cart",
+                        "cartpurge - remove contents of cart",
+                        "cartfin - finalize cart",
+                        "q - quit"
+                );
+                break;
+            case "whoami":
+                break;
+            case "lsprod":
+                break;
+            case "lsord":
+                break;
+            case "cartadd":
+                break;
+            case "cartpurge":
+                break;
+            case "cartfin":
+                break;
+            case "quit":
+            case "q":
+                em.close();
+                return;
+            default:
+                lines("Unrecognized command.",
+                        "Type 'help' to check available commands.");
+                break;
+        }
+
+        em.close();
+        customerMode(companyName);   
+    }  
+  #+end_src
+
+** Komenda ~whoami~
+   Analogiczna do wersji dostawców.
+   #+begin_src java
+            case "whoami":
+                lines("Customer " + customer.getCompanyName(),
+                        customer.getAddress());
+                break;   
+   #+end_src
+
+[[./imgs/h8.png]]
+** Komenda ~lsprod~
+   Wyświetla wszystkie produkty dostępne w sklepie.
+   #+begin_src java
+            case "lsprod":
+                Set<Product> availableProducts = Product.getAvailableProducts(em);
+                if(availableProducts.isEmpty()) {
+                    lines("No products at this moment.");
+                    break;
+                }
+                lines("Name | Qty");
+                for(Product product : availableProducts) {
+                    lines(String.format("%s | %d",
+                            product.getName(),
+                            product.getUnitsOnStock()),
+                            "---------");
+                }
+                break;   
+   #+end_src
+
+*** Metoda ~getAvailableProducts()~
+    #+begin_src java
+        public static Set<Product> getAvailableProducts(EntityManager em) {
+        TypedQuery<Product> query =
+                em.createQuery("SELECT p FROM products p WHERE p.unitsOnStock > 0", Product.class);
+        return query.getResultStream().collect(Collectors.toSet());
+    }
+    #+end_src
+
+[[./imgs/h9.png]]
+[[./imgs/h10.png]]
+** Komenda ~lsord~
+   Wyświetla status wszystkich złożonych zamówień konkretnego użytkownika.
+   Wyświetla status poszczególnych zamówień, tj. czy są sfinalizowane czy nie.
+   #+begin_src java
+            case "lsord":
+                List<BatchOrder> batchOrders = customer.getOrders();
+                for(BatchOrder batchOrder : batchOrders) {
+                    Set<SingleOrder> singleOrders = batchOrder.getSingleOrders();
+                    lines(String.format("=== BATCH ORDER %d ===", batchOrder.getId()));
+                    for(SingleOrder singleOrder : singleOrders) {
+                        lines(String.format("%s | %d ---> %s",
+                                singleOrder.getProduct().getName(),
+                                singleOrder.getQuantity(),
+                                (singleOrder.isFinalized()) ? "FINALIZED" : "PENDING"));
+                    }
+                }
+                break;   
+   #+end_src
+
+[[./imgs/h11.png]]
+[[./imgs/h12.png]]
+** Komenda ~cartls~
+** Komenda ~cartadd~
+** Komenda ~cartpurge~
+** Komenda ~cartfin~
