@@ -1,6 +1,9 @@
 package lab3.model;
 
+import org.apache.derby.client.am.DateTime;
+
 import javax.persistence.*;
+import java.sql.Timestamp;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -10,6 +13,8 @@ public class BatchOrder {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private int orderId;
 
+    private Timestamp orderDate;
+
     @OneToOne
     @JoinColumn
     private Customer customer;
@@ -18,6 +23,7 @@ public class BatchOrder {
     private Set<SingleOrder> singleOrders;
 
     public BatchOrder() {
+        this.orderDate = new Timestamp(System.currentTimeMillis());
         this.singleOrders = new HashSet<>();
     }
 
@@ -36,12 +42,5 @@ public class BatchOrder {
 
         singleOrders.add(singleOrder);
         product.setUnitsOnStock(product.getUnitsOnStock() - quantity);
-    }
-
-    public void summary() {
-        System.out.println("==== ORDER SUMMARY ====");
-        for(SingleOrder singleOrder : singleOrders) {
-            System.out.println(singleOrder.getProduct().getProductName() + " | " + singleOrder.getQuantity());
-        }
     }
 }

@@ -1,0 +1,477 @@
+#+TITLE: Hibernate - Praca Domowa
+#+Author: Dawid Macek
+#+LANGUAGE: pl
+#+OPTIONS: date:nil
+#+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
+#+LATEX_HEADER: \usepackage[AUTO]{babel}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
+#+HTML_HEAD: <style>pre.src {background-color: #303030; color: #e5e5e5;}</style>
+
+* Funkcjonalność zamawiania produktu
+  Rozszerz projekt/zaimplementuj aplikacje wprowadzajac możliwosc składania
+  zamowien na produkty (ew inne funkcjonalności wg własnego pomysłu stosownie do
+  umiejętności/czasu/preferencji/chęci poznania).
+
+** Nowości względem laboratoriów
+*** Modyfikacja ~Companies~ 
+    - Dodanie pola ~password~ umożliwiającego autentykację w systemie. 
+*** Usunięcie tabeli ~Invoices~
+    - Nie była ona potrzeba do realizacji funkcjonalności aplikacji.
+*** Nowa tabela ~Signle Orders~
+    - Określa zamówienie na konkretny produkt, zawiera ilość zamówionych produktów.
+    - Połączona relacją jeden do wiele z ~Products~ - jeden produkt ma wiele zamówień.
+    - Połączona relacją jeden do wiele z ~Batch Orders~ - jedno Batch Order ma wiele pojedycznczych zamówień.
+*** Nowa tabela ~Batch Orders~
+    - Określa zamówienie w skład którego wchodzą pojedyczncze zamówienia na poszczególne produkty.
+    - Połączona relacją jeden do wiele z ~Customers~ - jeden klient ma wiele takich zamówień.
+    - Połączona relacją jeden do wiele z ~Single Orders~ - Batch Order składa się z wielu pojedynczyh zamówień.
+
+** Schemat
+[[./imgs/h1.png]]
+
+** Realizacja w JPA
+*** ~Batch Orders~
+    #+begin_src java
+@Entity(name="batchorders")
+public class BatchOrder {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private int orderId;
+
+    private Timestamp orderDate;
+
+    @OneToOne
+    @JoinColumn
+    private Customer customer;
+
+    @OneToMany(mappedBy = "batchOrder", cascade = {CascadeType.PERSIST})
+    private Set<SingleOrder> singleOrders;
+
+    public BatchOrder() {
+        this.singleOrders = new HashSet<>();
+    }
+
+    public BatchOrder(Customer customer) {
+        this();
+        this.customer = customer;
+    }
+
+    public void makeOrder(Product product, int quantity) {
+        if(product.getUnitsOnStock() < quantity) {
+            throw new IllegalArgumentException("Not enough units in stock to make order.");
+        }
+
+        SingleOrder singleOrder = new SingleOrder(product, quantity);
+        singleOrder.setBatchOrder(this);
+
+        singleOrders.add(singleOrder);
+        product.setUnitsOnStock(product.getUnitsOnStock() - quantity);
+    }
+}
+    #+end_src
+
+*** ~Single Orders~
+    #+begin_src java
+@Entity(name="singleorders")
+public class SingleOrder {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private int orderId;
+    private int quantity;
+
+    private boolean finalized;
+
+    @OneToOne
+    @JoinColumn
+    private Product product;
+
+    @ManyToOne
+    @JoinColumn
+    private BatchOrder batchOrder;
+
+    public SingleOrder() { }
+
+    public SingleOrder(Product product, int quantity) {
+        this.product = product;
+        this.quantity = quantity;
+        this.finalized = false;
+    }
+
+    public void setBatchOrder(BatchOrder batchOrder) {
+        this.batchOrder = batchOrder;
+    }
+
+    public Product getProduct() {
+        return product;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+}
+    #+end_src
+
+* Działanie aplikacji
+  Aplikacja to klient pewnej hurtowni.
+  Użytkownicy logują się za pomocą danych otrzymanych od adminstracji.
+  Aplikacja wprowadza podział na role w zależności od pełnionej funkcji w systemie.
+** Wersja dla dostawców
+    - dodawanie nowych produktów
+    - uzupełnianie stanu magazynu
+    - finalizowanie zamówień
+** Wersja dla klientów
+    - przeglądanie stanu magazynu
+    - dodawanie/usuwanie produktów z koszyka
+    - przeglądanie przeszłych zamówień
+    - składanie zamówienia na produkty z koszyka
+    
+* Seedowanie bazy
+  Uzupełniamy bazę początkowymi danymi w celu późniejszego testowania.
+  
+  #+begin_src java
+   private static void seed() {
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+
+        // Companies
+        Customer c1 = new Customer("Januszpol", "123", "Jesionowa", "Białystok", "12-345");
+        Customer c2 = new Customer("BIO", "abc", "Szkolna", "Białystok", "12-345");
+        Supplier s1 = new Supplier("Coca-Cola", "qwerty", "1234 5678 9012 3456", "Krótka", "Warszawa", "21-376");
+
+        // Products
+        Product p1 = new Product("Czipsy", 10);
+        Product p2 = new Product("Koka Kola", 100);
+        p1.setSupplier(s1);
+        p2.setSupplier(s1);
+
+        // Orders
+        BatchOrder batchOrder = new BatchOrder(c1);
+        batchOrder.makeOrder(p1, 2);
+        batchOrder.makeOrder(p2, 5);
+
+        EntityTransaction etx = em.getTransaction();
+        etx.begin();
+        em.persist(c1);
+        em.persist(c2);
+        em.persist(s1);
+        em.persist(p1);
+        em.persist(p2);
+        em.persist(batchOrder);
+        etx.commit();
+        em.close();
+    }
+  #+end_src
+
+* Logika logowania
+  Na wejściu użytkownik proszony jest o podanie nazwy użytkownika i hasła.
+  Jeśli dla danego użytkownika hasło będzie się zgadzać to przechodzimy dalej.
+  Jeśli nie będzie się zgadzać, to użytkownik jest proszony ponownie o podanie danych.
+
+  #+begin_src java
+    private static Company logIn() throws IOException {
+        BufferedReader reader =
+                new BufferedReader(new InputStreamReader(System.in));
+
+        System.out.println("Username: ");
+        String username = reader.readLine().trim();
+        System.out.println("Password: ");
+        String password = reader.readLine().trim();
+
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+        Company comp = Company.getByCredentials(em, username, password);
+        em.close();
+
+        if(comp != null) {
+            System.out.println("Success!");
+            return comp;
+        }
+
+        System.out.println("Invalid credentials. Try again.");
+        return logIn();
+    }  
+  #+end_src
+
+** Wykonywane zapytanie
+   #+begin_src java
+    public static Company getByCredentials(EntityManager em, String companyName, String password) {
+        TypedQuery<Company> q = em.createQuery(
+                "SELECT c FROM companies c WHERE c.companyName = :username AND c.password = :pass",
+                Company.class);
+
+        q.setParameter("username", companyName);
+        q.setParameter("pass", password);
+
+        // .getSingleResults() throws Exception when result not found
+        try {
+            return q.getSingleResult();
+        } catch(Exception e) {
+            return null;
+        }
+    }   
+   #+end_src
+
+** Generowane zapytanie
+   Zapytanie wygenerowane przez query wyżej.
+   #+begin_src 
+    select
+        company0_.companyName as companyN1_2_,
+        company0_.city as city2_2_,
+        company0_.password as password3_2_,
+        company0_.street as street4_2_,
+        company0_.zipCode as zipCode5_2_,
+        company0_1_.bankAccountNumber as bankAcco1_6_,
+        company0_2_.discount as discount1_3_,
+        case 
+            when company0_1_.companyName is not null then 1 
+            when company0_2_.companyName is not null then 2 
+            when company0_.companyName is not null then 0 
+            else -1 
+        end as clazz_ 
+    from
+        companies company0_ 
+    left outer join
+        suppliers company0_1_ 
+            on company0_.companyName=company0_1_.companyName 
+    left outer join
+        customers company0_2_ 
+            on company0_.companyName=company0_2_.companyName 
+    where
+        company0_.companyName=? 
+        and company0_.password=?   
+   #+end_src
+
+** Wykrywanie rodzaju klienta
+   Dwie pomocnicze metody stworzone do tego celu w klasie ~Company~.
+   #+begin_src java
+    public boolean isSupplier() {
+        return getClass().equals(Supplier.class);
+    }
+
+    public boolean isCustomer() {
+        return getClass().equals(Customer.class);
+    }   
+   #+end_src
+
+** Uruchamianie odpowiedniej wersji
+   #+begin_src java
+    public static void main(String[] args) throws IOException {
+        addManyCompanies();
+
+        Company c = logIn();
+        if(c != null) {
+            lines("Type 'help' to check available commands.");
+            if(c.isSupplier()) {
+                supplierMode(c.getCompanyName());
+            } else {
+                customerMode(c.getCompanyName());
+            }
+        }
+    } 
+   #+end_src
+
+* Wersja dla dostawców
+  Użytkownik wykonuje operacje poprzez wpisywanie odpowiednich komend.
+  W kolejnych punktach przedstawiam implementację każdej z komend.
+  Szkielet kodu wygląda następująco.
+
+  #+begin_src java
+    private static Object supplierMode(String companyName) throws IOException {
+        BufferedReader reader =
+                new BufferedReader(new InputStreamReader(System.in));
+        Scanner scanner =
+                new Scanner(reader);
+        EntityManager em = JPAUtils.getEntityManagerFactory().createEntityManager();
+        EntityTransaction etx;
+        Supplier supplier = em.find(Supplier.class, companyName);
+
+        switch (reader.readLine()) {
+            case "?":
+            case "help":
+                lines(
+                        "?/help - displays this message",
+                        "whoami - info about current user",
+                        "lsprod - lists products managed by current user",
+                        "modprod - allows creating/restocking products",
+                        "lsord - lists orders awaiting finalization",
+                        "fin - order finalization",
+                        "q - quit"
+                );
+                break;
+            case "lsprod":
+                break;
+            case "modprod":
+                break;
+            case "lsord":
+                break;
+            case "fin":
+                break;
+            case "quit":
+            case "q":
+                em.close();
+                return null;
+            default:
+                lines("Unrecognized command.",
+                        "Type 'help' to check available commands.");
+                break;
+        }
+
+        em.close();
+        return supplierMode(companyName);
+    }  
+  #+end_src
+  [[./imgs/h2.png]]
+
+** Funkcja pomocnicza: ~lines()~
+   Funkcja przyjmująca różną ilość argumentów.
+   Pozwala na trochę ładniejsze printowanie wielu linii niż przy użyciu standardowego ~System.out.println()~
+  #+begin_src java
+    private static void lines(String ... args) {
+        for(String line : args) {
+            System.out.println(line);
+        }
+    }   
+   #+end_src
+
+** Komenda ~whoami~
+   Wyświetla informacje o obecnie zalogowanym użytkowniku.
+   #+begin_src java
+            case "whoami":
+                lines("Supplier " + supplier.getCompanyName(),
+                        supplier.getAddress());
+                break;   
+   #+end_src
+** Komenda ~lsprod~
+   Wyświetla wszystkie produkty wystawione przez obecnie zalogowanego dostawcę.
+   #+begin_src java
+            case "lsprod":
+                Set<Product> suppliedProducts = supplier.getSuppliedProducts();
+                if(suppliedProducts.isEmpty()) {
+                    lines("No products supplied by yourself.");
+                    break;
+                }
+                for(Product product : suppliedProducts) {
+                    lines(String.format("%s | %d",
+                                    product.getProductName(),
+                                    product.getUnitsOnStock()),
+                            "---------");
+                }
+                break;   
+   #+end_src
+[[./imgs/h3.png]]
+** Komenda ~modprod~
+   Pozwala na dodawanie lub edycję istniejących produktów produktów.
+   #+begin_src java
+            case "modprod":
+                lines("Product name: ");
+                String prodName = reader.readLine().trim();
+                if(prodName.isEmpty()) {
+                    lines("Invalid name.");
+                    break;
+                }
+
+                lines("Units in stock: ");
+                int unitsInStock = scanner.nextInt();
+                if(unitsInStock < 0) {
+                    lines("Value must be greater or equal to zero.");
+                    break;
+                }
+
+                Product product = em.find(Product.class, prodName);
+                boolean newProduct = (product == null);
+
+                // When creating new.
+                if(newProduct) {
+                    product = new Product(prodName, unitsInStock);
+                    supplier.getSuppliedProducts().add(product);
+                    product.setSupplier(supplier);
+
+                    lines("No such product in database. Are you sure you want to create one?(Y/N): ");
+                    if(!reader.readLine().toLowerCase().equals("y")) {
+                        lines("Aborting...");
+                        break;
+                    }
+                }
+                // When not owner
+                else if(!product.getSupplier().getCompanyName().equals(supplier.getCompanyName())) {
+                    lines("AUTHORIZATION ERROR",
+                            "You cannot manage products of different suppliers.");
+                    break;
+                }
+                // When updating existing
+                else {
+                    lines("UPDATED TO " + unitsInStock);
+                    product.setUnitsOnStock(unitsInStock);
+                }
+
+                etx = em.getTransaction();
+                etx.begin();
+                em.persist(product);
+                etx.commit();
+                break;   
+   #+end_src
+   [[./imgs/h4.png]]
+** Komenda ~lsord~
+   Wyświetla niesfinalizowane zamówienia na produkty oferowane przez obecnie zalogowanego dostawcę.
+   #+begin_src java
+            case "lsord":
+                Set<SingleOrder> pending = supplier.getPendingOrders();
+                if(pending.isEmpty()) {
+                    lines("No pending orders.");
+                    break;
+                }
+                lines("Id | Product | Qty");
+                for(SingleOrder order : pending) {
+                    lines(String.format("%d | %s | %d",
+                            order.getId(),
+                            order.getProduct().getName(),
+                            order.getQuantity()),
+                            "---------");
+                }
+                break;   
+   #+end_src
+*** Implementacja ~getPendingOrders()~
+    Jest to metoda klasy Supplier.
+    #+begin_src java
+    public Set<SingleOrder> getPendingOrders() {
+        return suppliedProducts.stream()
+                .flatMap((product) -> product.getOrders().stream())
+                .filter((order) -> !order.isFinalized())
+                .collect(Collectors.toSet());
+    }    
+    #+end_src
+
+[[./imgs/h5.png]]
+** Komenda ~fin~
+   Prosi o podanie numeru dostawy, a następnie pyta czy na pewno dokonać finalizacji.
+   #+begin_src java
+            case "fin":
+                lines("Order Id: ");
+                int orderId = scanner.nextInt();
+
+                SingleOrder order = em.find(SingleOrder.class, orderId);
+                if(order == null) {
+                    lines("Unable to find order with this identifier.", "Aborting...");
+                    break;
+                }
+
+                lines(String.format("%d | %s | %d",
+                        order.getId(),
+                        order.getProduct().getName(),
+                        order.getQuantity()),
+                        "Are you sure you want to finalize this order? [Y/N]");
+
+                if(!reader.readLine().toLowerCase().equals("y")) {
+                    lines("Aborting...");
+                    break;
+                }
+
+                order.setFinalized(true);
+                etx = em.getTransaction();
+                etx.begin();
+                em.persist(order);
+                etx.commit();
+                break;   
+   #+end_src
+
+[[./imgs/h6.png]]
+[[./imgs/h7.png]]
+* Wersja dla klientów

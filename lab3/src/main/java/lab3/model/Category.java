@@ -7,8 +7,6 @@ import java.util.List;
 @Entity(name="categories")
 public class Category {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private int categoryId;
     private String name;
 
     @OneToMany(mappedBy = "category")
@@ -19,6 +17,10 @@ public class Category {
     public Category(String name) {
         this.name = name;
         this.products = new ArrayList<>();
+    }
+
+    public String getName() {
+        return name;
     }
 
     public void addProduct(Product product) {

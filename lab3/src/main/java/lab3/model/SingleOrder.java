@@ -9,6 +9,8 @@ public class SingleOrder {
     private int orderId;
     private int quantity;
 
+    private boolean finalized;
+
     @OneToOne
     @JoinColumn
     private Product product;
@@ -22,10 +24,15 @@ public class SingleOrder {
     public SingleOrder(Product product, int quantity) {
         this.product = product;
         this.quantity = quantity;
+        this.finalized = false;
     }
 
     public void setBatchOrder(BatchOrder batchOrder) {
         this.batchOrder = batchOrder;
+    }
+
+    public int getId() {
+        return orderId;
     }
 
     public Product getProduct() {
@@ -34,5 +41,13 @@ public class SingleOrder {
 
     public int getQuantity() {
         return quantity;
+    }
+
+    public boolean isFinalized() {
+        return finalized;
+    }
+
+    public void setFinalized(boolean finalized) {
+        this.finalized = finalized;
     }
 }

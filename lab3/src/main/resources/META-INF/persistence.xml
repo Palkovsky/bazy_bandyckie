@@ -11,7 +11,6 @@ http://java.sun.com/xml/ns/persistence/persistence_2_0.xsd"
         <class>lab3.model.Supplier</class>
         <class>lab3.model.Customer</class>
         <class>lab3.model.Category</class>
-        <class>lab3.model.Invoice</class>
         <class>lab3.model.Address</class>
         <class>lab3.model.SingleOrder</class>
         <class>lab3.model.BatchOrder</class>

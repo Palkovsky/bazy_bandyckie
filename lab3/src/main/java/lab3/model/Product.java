@@ -19,21 +19,17 @@ public class Product {
     @JoinColumn
     private Category category;
 
-    @ManyToMany(cascade = {CascadeType.PERSIST})
-    private Set<Invoice> invoices;
+    @OneToMany(mappedBy = "product")
+    private Set<SingleOrder> orders;
 
     public Product() {
-        this.invoices = new HashSet<>();
+        this.orders = new HashSet<>();
     }
 
     public Product(String productName, int unitsOnStock) {
         this();
         this.productName = productName;
         this.unitsOnStock = unitsOnStock;
-    }
-
-    public Set<Invoice> getInvoices() {
-        return invoices;
     }
 
     public void setSupplier(Supplier supplier) {
@@ -44,8 +40,16 @@ public class Product {
         this.category = category;
     }
 
+    public String getCategoryAsString() {
+        return (category != null) ? category.getName() : "none";
+    }
+
     public Category getCategory() {
         return category;
+    }
+
+    public Supplier getSupplier() {
+        return supplier;
     }
 
     public int getUnitsOnStock() {
@@ -56,7 +60,11 @@ public class Product {
         this.unitsOnStock = unitsOnStock;
     }
 
-    public String getProductName() {
+    public String getName() {
         return productName;
+    }
+
+    public Set<SingleOrder> getOrders() {
+        return orders;
     }
 }
