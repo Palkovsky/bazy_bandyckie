@@ -2,5 +2,8 @@
 agh-databases/
 *.tex
 .gradle
+
 lab4/dataset
 lab4/.*
+lab4/bin
+lab4/*.iml

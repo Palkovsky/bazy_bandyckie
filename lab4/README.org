@@ -1,0 +1,191 @@
+* Zadanie 5
+** 5a
+   Biznesy pięciogwiazdkowe.
+   #+begin_src js
+   db.business.find({stars: 5.0})
+   #+end_src
+** 5b
+   Ilość resteuracji w każdym mieście.
+   #+begin_src js
+   db.business.aggregate([
+     {$match: {categories: {$elemMatch: {$eq: "Restaurants"}}}},
+     {$group: { _id: "$city", total: { $sum: 1} }},
+     {$sort: {total: -1}}
+   ]);
+   #+end_src
+** 5c
+   Ilość hoteli w każdym stanie z darmowym Wi-Fi oraz liczbą gwiazdek większą lub równą 4.5.
+   #+begin_src js
+db.business.aggregate([
+    {$match: {
+        categories: {$elemMatch: {$eq: "Hotels"}},
+        "attributes.Wi-Fi": {$eq: "free"},
+        stars: {$gte: 4.5}
+    }},
+    {$group: { _id: "$state", total: { $sum: 1} }},
+    {$sort: {total: -1} }
+]);   
+   #+end_src
+
+* Zadanie 6
+** 6a
+   #+begin_src java
+     private void _6a1() {
+        DBCursor cursor = db.getCollection("business")
+                .find(new BasicDBObject("stars", 5.0));
+
+        while (cursor.hasNext()) {
+            System.out.println(cursor.next());
+        }
+        cursor.close();
+    }
+   #+end_src
+** 6b
+   #+begin_src java
+   private void _6b() {
+    	AggregationOutput output = db.getCollection("business")
+				.aggregate(new ArrayList<>(Arrays.asList(
+						new BasicDBObject("$match",
+							new BasicDBObject("categories",
+								new BasicDBObject("$elemMatch", new BasicDBObject("$eq", "Restaurants")))),
+						new BasicDBObject("$group",
+								new BasicDBObject("_id", "$city")
+										.append("total", new BasicDBObject("$sum", 1))),
+						new BasicDBObject("$sort", new BasicDBObject("total", -1))
+				)));
+
+    	for(DBObject object : output.results()) {
+			System.out.println(object);
+		}
+	}   
+   #+end_src
+** 6c
+   #+begin_src java
+	private void _6c() {
+		AggregationOutput output = db.getCollection("business")
+				.aggregate(new ArrayList<>(Arrays.asList(
+						new BasicDBObject("$match",
+								new BasicDBObject()
+									.append("categories",
+											new BasicDBObject("$elemMatch",
+													new BasicDBObject("$eq", "Hotels")))
+									.append("attributes.Wi-Fi",
+											new BasicDBObject("$eq", "free"))
+									.append("stars",
+											new BasicDBObject("$gte", 4.5)))
+						,
+						new BasicDBObject("$group",
+								new BasicDBObject("_id", "$state")
+										.append("total", new BasicDBObject("$sum", 1))),
+						new BasicDBObject("$sort", new BasicDBObject("total", -1))
+				)));
+		
+		for(DBObject object : output.results()) {
+			System.out.println(object);
+		}
+	}   
+   #+end_src
+
+* Zadanie 7
+** W Robo3T
+   Teraz wystarczy pobrać użytkownika o id będącego pierwszym w rezultacie.
+   #+begin_src js
+   db.review.aggregate([
+     {$match: {stars: {$gte: 4.5}}},
+     {$group: { _id: "$user_id", total: { $sum: 1} }},
+     {$sort: {total: -1}}
+  ])
+   #+end_src
+   
+   #+begin_src java
+	private void _7(){
+		AggregationOutput output = db.getCollection("review")
+				.aggregate(new ArrayList<>(Arrays.asList(
+						new BasicDBObject("$match",
+								new BasicDBObject("stars",
+										new BasicDBObject("$gte", 4.5))),
+						new BasicDBObject("$group",
+								new BasicDBObject("_id", "$user_id")
+										.append("total", new BasicDBObject("$sum", 1))),
+						new BasicDBObject("$sort", new BasicDBObject("total", -1))
+				)));
+
+		Iterator<DBObject> iterator = output.results().iterator();
+		if(!iterator.hasNext()) {
+			System.out.println("ERROR: Unable to locate user.");
+			return;
+		}
+
+		DBObject first = iterator.next();
+		String userId = (String) first.get("_id");
+
+		Cursor cursor = db.getCollection("user")
+				.find(new BasicDBObject("user_id", userId));
+
+		if(cursor.hasNext()) {
+			System.out.println(cursor.next());
+			return;
+		}
+
+		System.out.println("ERROR: Unable to locate user.");
+	}   
+   #+end_src
+
+* Zadanie 8
+** Mongshell - mapReduce
+  #+begin_src js
+db.review.mapReduce(
+    function() { 
+        emit("counts", 
+            {
+                "funny" : this.votes.funny,
+                "useful": this.votes.useful,
+                "cool": this.votes.cool
+            }
+    )},
+    function(key, values) {
+        let summed = {"funny": 0, "useful": 0, "cool": 0};
+        for(let i=0; i<values.length; i++) {
+            summed["funny"] += values[i]["funny"];
+            summed["useful"] += values[i]["useful"];
+            summed["cool"] += values[i]["cool"];
+
+        }
+        return summed;
+    },
+    {out: "dbStats"}
+).find();
+  #+end_src
+
+** Java
+   #+begin_src java
+	private void _8() {
+		DBCollection collection = db.getCollection("review");
+
+		String mapFunc =
+				"function() { \n" +
+						"        emit(\"counts\", \n" +
+						"            {\n" +
+						"                \"funny\" : this.votes.funny,\n" +
+						"                \"useful\": this.votes.useful,\n" +
+						"                \"cool\": this.votes.cool\n" +
+						"            }\n" +
+						"    )}";
+		String reduceFunc =
+				"function(key, values) {\n" +
+						"        let summed = {\"funny\": 0, \"useful\": 0, \"cool\": 0};\n" +
+						"        for(let i=0; i<values.length; i++) {\n" +
+						"            summed[\"funny\"] += values[i][\"funny\"];\n" +
+						"            summed[\"useful\"] += values[i][\"useful\"];\n" +
+						"            summed[\"cool\"] += values[i][\"cool\"];\n" +
+						"        }\n" +
+						"        return summed;\n" +
+						"    }";
+
+		MapReduceCommand mapRed =
+				new MapReduceCommand(collection, mapFunc, reduceFunc, null, MapReduceCommand.OutputType.INLINE, null);
+
+		MapReduceOutput output = collection.mapReduce(mapRed);
+		System.out.println(output.results().iterator().next());
+	}   
+   #+end_src
