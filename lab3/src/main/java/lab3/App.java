@@ -21,7 +21,7 @@ public class App {
             if(c.isSupplier()) {
                 supplierMode(c.getCompanyName());
             } else {
-                customerMode(c.getCompanyName());
+                customerMode(c.getCompanyName(), new BatchOrder());
             }
         }
     }
@@ -103,7 +103,6 @@ public class App {
                 }
                 // When updating existing
                 else {
-                    lines("UPDATED TO " + unitsInStock);
                     product.setUnitsOnStock(unitsInStock);
                 }
 
@@ -111,6 +110,8 @@ public class App {
                 etx.begin();
                 em.persist(product);
                 etx.commit();
+
+                lines("Done.");
                 break;
             case "lsord":
                 Set<SingleOrder> pending = supplier.getPendingOrders();
@@ -168,7 +169,7 @@ public class App {
         supplierMode(companyName);
     }
 
-    private static void customerMode(String companyName) throws IOException {
+    private static void customerMode(String companyName, BatchOrder cart) throws IOException {
         BufferedReader reader =
                 new BufferedReader(new InputStreamReader(System.in));
         Scanner scanner =
@@ -223,11 +224,72 @@ public class App {
                     }
                 }
                 break;
+            case "cartls":
+                Set<SingleOrder> orders = cart.getSingleOrders();
+                if(orders.isEmpty()) {
+                    lines("Your cart is empty.");
+                    break;
+                }
+                lines("Cart contents: ");
+                for(SingleOrder order : orders) {
+                    Product product = order.getProduct();
+                    lines(String.format("%s | %d",
+                            product.getName(),
+                            order.getQuantity()),
+                            "---------");
+                }
+                break;
             case "cartadd":
+                lines("Product name to add: ");
+                String prodName = reader.readLine();
+
+                Product productToAdd = em.find(Product.class, prodName);
+                if(productToAdd == null) {
+                    lines("Invalid product name.", "Aborting...");
+                    break;
+                }
+
+                int maxQty = productToAdd.getUnitsOnStock();
+                lines(String.format("Quantity(MAX %d): ", maxQty));
+                int orderQty = scanner.nextInt();
+                if(orderQty < 0 || orderQty > maxQty) {
+                    lines("Invalid quantity amount.", "Aborting...");
+                    break;
+                }
+
+                cart.makeOrder(productToAdd, orderQty);
+
+                // We only persist product, to make sure units on stock is lowered
+                etx = em.getTransaction();
+                etx.begin();
+                em.persist(productToAdd);
+                etx.commit();
                 break;
             case "cartpurge":
+                etx = em.getTransaction();
+                etx.begin();
+                for(SingleOrder order : cart.getSingleOrders()) {
+                    String productName = order.getProduct().getName();
+                    Product productToFix = em.find(Product.class, productName);
+                    if(productToFix != null) {
+                        productToFix.setUnitsOnStock(productToFix.getUnitsOnStock() + order.getQuantity());
+                        em.persist(productToFix);
+                    }
+                }
+                etx.commit();
+                cart = new BatchOrder();
                 break;
             case "cartfin":
+                if(cart.getSingleOrders().isEmpty()) {
+                    lines("You can't finalize empty order.");
+                    break;
+                }
+                cart.setCustomer(customer);
+                etx = em.getTransaction();
+                etx.begin();
+                em.persist(cart);
+                etx.commit();
+                cart = new BatchOrder();
                 break;
             case "quit":
             case "q":
@@ -240,7 +302,7 @@ public class App {
         }
 
         em.close();
-        customerMode(companyName);
+        customerMode(companyName, cart);
     }
 
     private static void lines(String ... args) {

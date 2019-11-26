@@ -209,36 +209,6 @@ public class SingleOrder {
     }   
    #+end_src
 
-** Generowane zapytanie
-   Zapytanie wygenerowane przez query wyżej.
-   #+begin_src 
-    select
-        company0_.companyName as companyN1_2_,
-        company0_.city as city2_2_,
-        company0_.password as password3_2_,
-        company0_.street as street4_2_,
-        company0_.zipCode as zipCode5_2_,
-        company0_1_.bankAccountNumber as bankAcco1_6_,
-        company0_2_.discount as discount1_3_,
-        case 
-            when company0_1_.companyName is not null then 1 
-            when company0_2_.companyName is not null then 2 
-            when company0_.companyName is not null then 0 
-            else -1 
-        end as clazz_ 
-    from
-        companies company0_ 
-    left outer join
-        suppliers company0_1_ 
-            on company0_.companyName=company0_1_.companyName 
-    left outer join
-        customers company0_2_ 
-            on company0_.companyName=company0_2_.companyName 
-    where
-        company0_.companyName=? 
-        and company0_.password=?   
-   #+end_src
-
 ** Wykrywanie rodzaju klienta
    Dwie pomocnicze metody stworzone do tego celu w klasie ~Company~.
    #+begin_src java
@@ -262,12 +232,14 @@ public class SingleOrder {
             if(c.isSupplier()) {
                 supplierMode(c.getCompanyName());
             } else {
-                customerMode(c.getCompanyName());
+                customerMode(c.getCompanyName(), new BatchOrder());
             }
         }
     } 
    #+end_src
 
+
+[[./imgs/h2.png]]
 * Wersja dla dostawców
   Użytkownik wykonuje operacje poprzez wpisywanie odpowiednich komend.
   W kolejnych punktach przedstawiam implementację każdej z komend.
@@ -318,7 +290,8 @@ public class SingleOrder {
         supplierMode(companyName);
     }  
   #+end_src
-  [[./imgs/h2.png]]
+
+[[./imgs/h3.png]]
 
 ** Funkcja pomocnicza: ~lines()~
    Funkcja przyjmująca różną ilość argumentów.
@@ -339,6 +312,7 @@ public class SingleOrder {
                         supplier.getAddress());
                 break;   
    #+end_src
+[[./imgs/h4.png]]
 ** Komenda ~lsprod~
    Wyświetla wszystkie produkty wystawione przez obecnie zalogowanego dostawcę.
    #+begin_src java
@@ -356,9 +330,9 @@ public class SingleOrder {
                 }
                 break;   
    #+end_src
-[[./imgs/h3.png]]
+[[./imgs/h5.png]]
 ** Komenda ~modprod~
-   Pozwala na dodawanie lub edycję istniejących produktów produktów.
+   Pozwala na dodawanie lub edycję istniejących produktów.
    #+begin_src java
             case "modprod":
                 lines("Product name: ");
@@ -408,7 +382,8 @@ public class SingleOrder {
                 etx.commit();
                 break;   
    #+end_src
-   [[./imgs/h4.png]]
+[[./imgs/h7.png]]
+[[./imgs/h8.png]]
 ** Komenda ~lsord~
    Wyświetla niesfinalizowane zamówienia na produkty oferowane przez obecnie zalogowanego dostawcę.
    #+begin_src java
@@ -439,7 +414,7 @@ public class SingleOrder {
     }    
     #+end_src
 
-[[./imgs/h5.png]]
+[[./imgs/h6.png]]
 ** Komenda ~fin~
    Prosi o podanie numeru dostawy, a następnie pyta czy na pewno dokonać finalizacji.
    #+begin_src java
@@ -472,13 +447,12 @@ public class SingleOrder {
                 break;   
    #+end_src
 
-[[./imgs/h6.png]]
-[[./imgs/h7.png]]
+[[./imgs/h9.png]]
 * Wersja dla klientów
   Szkielet dla wersji dla klientów jest podobny do tego z wersji dla dostawców.
 
   #+begin_src java
-    private static void customerMode(String companyName) throws IOException {
+    private static void customerMode(String companyName, BatchOrder cart) throws IOException {
         BufferedReader reader =
                 new BufferedReader(new InputStreamReader(System.in));
         Scanner scanner =
@@ -508,6 +482,8 @@ public class SingleOrder {
                 break;
             case "lsord":
                 break;
+            case "cartls":
+                break;
             case "cartadd":
                 break;
             case "cartpurge":
@@ -525,9 +501,10 @@ public class SingleOrder {
         }
 
         em.close();
-        customerMode(companyName);   
+        customerMode(companyName, cart);   
     }  
   #+end_src
+[[./imgs/h10.png]]
 
 ** Komenda ~whoami~
    Analogiczna do wersji dostawców.
@@ -538,7 +515,7 @@ public class SingleOrder {
                 break;   
    #+end_src
 
-[[./imgs/h8.png]]
+[[./imgs/h11.png]]
 ** Komenda ~lsprod~
    Wyświetla wszystkie produkty dostępne w sklepie.
    #+begin_src java
@@ -567,8 +544,8 @@ public class SingleOrder {
     }
     #+end_src
 
-[[./imgs/h9.png]]
-[[./imgs/h10.png]]
+[[./imgs/h12.png]]
+
 ** Komenda ~lsord~
    Wyświetla status wszystkich złożonych zamówień konkretnego użytkownika.
    Wyświetla status poszczególnych zamówień, tj. czy są sfinalizowane czy nie.
@@ -588,9 +565,98 @@ public class SingleOrder {
                 break;   
    #+end_src
 
-[[./imgs/h11.png]]
-[[./imgs/h12.png]]
+[[./imgs/h13.png]]
+
 ** Komenda ~cartls~
+   Komenda służąca do wylistowania obecnej zawartości koszyka.
+   #+begin_src java
+            case "cartls":
+                Set<SingleOrder> orders = cart.getSingleOrders();
+                if(orders.isEmpty()) {
+                    lines("Your cart is empty.");
+                    break;
+                }
+                lines("Cart contents: ");
+                for(SingleOrder order : orders) {
+                    Product product = order.getProduct();
+                    lines(String.format("%s | %d",
+                            product.getName(),
+                            order.getQuantity()),
+                            "---------");
+                }
+                break;   
+   #+end_src
+[[./imgs/h14.png]]
 ** Komenda ~cartadd~
+   Służy do doania produktu do koszyka.
+   Po dodaniu produktu, jego wartość ~unitsOnStock~ jest obniżana aby uniemożliwić zamówienia przekraczajce początkową wartość.
+   #+begin_src java
+            case "cartadd":
+                lines("Product name to add: ");
+                String prodName = reader.readLine();
+
+                Product product = em.find(Product.class, prodName);
+                if(product == null) {
+                    lines("Invalid product name.", "Aborting...");
+                    break;
+                }
+
+                int maxQty = product.getUnitsOnStock();
+                lines(String.format("Quantity(MAX %d): ", maxQty));
+                int orderQty = scanner.nextInt();
+                if(orderQty < 0 || orderQty > maxQty) {
+                    lines("Invalid quantity amount.", "Aborting...");
+                    break;
+                }
+
+                cart.makeOrder(product, orderQty);
+
+                // We only persist product, to make sure units on stock is lowered.
+                etx = em.getTransaction();
+                etx.begin();
+                em.persist(product);
+                etx.commit();
+                break;   
+   #+end_src
+
+[[./imgs/h15.png]]
 ** Komenda ~cartpurge~
+   Komenda służąca do opróżnienia zawartości koszyka.
+   Przywraca odpowiednią wartość pola ~unitsOnStock~.
+   #+begin_src java
+            case "cartpurge":
+                etx = em.getTransaction();
+                etx.begin();
+                for(SingleOrder order : cart.getSingleOrders()) {
+                    String productName = order.getProduct().getName();
+                    Product productToFix = em.find(Product.class, productName);
+                    if(productToFix != null) {
+                        productToFix.setUnitsOnStock(productToFix.getUnitsOnStock() + order.getQuantity());
+                        em.persist(productToFix);
+                    }
+                }
+                etx.commit();
+                cart = new BatchOrder();
+                break;
+   #+end_src
+
+[[./imgs/h16.png]]
 ** Komenda ~cartfin~
+   Potwierdza koszyk i dodaje ~Batch Order~ wraz z ~Single Orders~ do bazy danych. 
+   Używany jest tutaj kaskadowy zapis.
+   #+begin_src java
+            case "cartfin":
+                if(cart.getSingleOrders().isEmpty()) {
+                    lines("You can't finalize empty order.");
+                    break;
+                }
+                cart.setCustomer(customer);
+                etx = em.getTransaction();
+                etx.begin();
+                em.persist(cart);
+                etx.commit();
+                cart = new BatchOrder();
+                break;   
+   #+end_src
+
+[[./imgs/h17.png]]

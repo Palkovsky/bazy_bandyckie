@@ -48,6 +48,10 @@ public class BatchOrder {
         return orderId;
     }
 
+    public void setCustomer(Customer customer) {
+        this.customer = customer;
+    }
+
     public Set<SingleOrder> getSingleOrders() {
         return singleOrders;
     }
