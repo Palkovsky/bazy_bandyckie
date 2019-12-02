@@ -47,12 +47,12 @@
    Określ, ile każde przedsiębiorstwo otrzymało wskazówek/napiwków(tip) w 2012.
    Wynik posortuj alfabetycznie na podstawie liczby (tip).
    #+begin_src js
-     // Wersja prostsza, ale wyświetlająca tylko business_
+     // Wersja prostsza, ale wyświetlająca tylko business_id
      db.tip.aggregate([
        {$match: {date: {$regex: /^2012-/}}},
        {$group: { _id: "$business_id", cnt: { $sum: 1} }},
        {$sort: {cnt: 1}}
-       ]); 
+     ]); 
 
      // Fajniejsza wersja, która zamiast business_id wyświetla nazwę biznesu.
      // Z tym, że jest tak wolna, że nie doczekałem pełnego wykonania.
