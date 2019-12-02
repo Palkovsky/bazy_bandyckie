@@ -1,4 +1,4 @@
-#+TITLE: Mongo Db - Praca domowa
+#+TITLE: MongoDB - Praca domowa
 #+Author: Dawid Macek
 #+LANGUAGE: pl
 #+OPTIONS: date:nil
@@ -11,7 +11,6 @@
   ~mongoimport~ nie pozwala na specyfikowanie typów dla plików JSONowych.
   Z tego powodu daty importowane są jak stringi.
   Typy można łatwo skonwertować odpowiednio updatując obiekty, ale ja zostałem przy datach reprezentowanych jako stringi.
-
 
   #+end_src
 * Zadanie 1
