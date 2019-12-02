@@ -1,191 +1,143 @@
-* Zadanie 5
-** 5a
-   Biznesy pięciogwiazdkowe.
+#+TITLE: Mongo Db - Praca domowa
+#+Author: Dawid Macek
+#+LANGUAGE: pl
+#+OPTIONS: date:nil
+#+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
+#+LATEX_HEADER: \usepackage[AUTO]{babel}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
+#+HTML_HEAD: <style>pre.src {background-color: #303030; color: #e5e5e5;}</style>
+
+* Wstęp
+  ~mongoimport~ nie pozwala na specyfikowanie typów dla plików JSONowych.
+  Z tego powodu daty importowane są jak stringi.
+  Typy można łatwo skonwertować odpowiednio updatując obiekty, ale ja zostałem przy datach reprezentowanych jako stringi.
+
+
+  #+end_src
+* Zadanie 1
+  Wykorzystując bazę danych *yelp dataset* wykonaj zapytanie i komendy MongoDB, aby uzyskać następujące rezultaty.
+** Zadanie 1a
+   Zwróć bez powtórzeń wszystkie nazwy miast w których znajdują się firmy(business).
+   Wynik posortuj na podstawie nazwy miasta alfabetycznie.
    #+begin_src js
-   db.business.find({stars: 5.0})
+     db.business.distinct('city').sort()   
    #+end_src
-** 5b
-   Ilość resteuracji w każdym mieście.
+** Zadanie 1b
+   Zwróć liczbę wszystkich recenzji, które pojawiły się po 2011 roku (włącznie).
    #+begin_src js
-   db.business.aggregate([
-     {$match: {categories: {$elemMatch: {$eq: "Restaurants"}}}},
-     {$group: { _id: "$city", total: { $sum: 1} }},
-     {$sort: {total: -1}}
-   ]);
+     // Zliczanie w Mongo bardzo wolne.
+     // .find() zwraca poprawne rezultaty
+     // Nie doczekałem do zakończenia .count(), ale jestem przekonany że zapytanie jest poprawne.
+     db.review.find({$where: 'function() { return new Date(this.date).getFullYear() >= 2011}'}).count()
+
+     // Można też próbować agregacją, z tym że w tam nie można używać $where.
+     // Trzebaby jakoś przekonwertować liczbę przed pierwszym myślnikiem i ją sprawdzać.
    #+end_src
-** 5c
-   Ilość hoteli w każdym stanie z darmowym Wi-Fi oraz liczbą gwiazdek większą lub równą 4.5.
+** Zadanie 1c
+   Zwróć dane wszystkich zamkniętych(open) firm(business) z pól: nazwa, adres, gwiazdki (stars).
    #+begin_src js
-db.business.aggregate([
-    {$match: {
-        categories: {$elemMatch: {$eq: "Hotels"}},
-        "attributes.Wi-Fi": {$eq: "free"},
-        stars: {$gte: 4.5}
-    }},
-    {$group: { _id: "$state", total: { $sum: 1} }},
-    {$sort: {total: -1} }
-]);   
+    db.business.find({open: false}, {name: 1, full_address: 1, stars: 1})   
    #+end_src
-
-* Zadanie 6
-** 6a
-   #+begin_src java
-     private void _6a1() {
-        DBCursor cursor = db.getCollection("business")
-                .find(new BasicDBObject("stars", 5.0));
-
-        while (cursor.hasNext()) {
-            System.out.println(cursor.next());
-        }
-        cursor.close();
-    }
+** Zadanie 1d
+   Zwróć dane wszystkich użytkowników(user), którzy nie uzyskali ani jednego pozytywnego głosu z kategorii(funny lub useful), 
+   wynik posortuj alfabetycznie na podstawie imienia użytkownika.
+   #+begin_src js
+     db.user.find({$and: [{'votes.funny': 0}, {'votes.useful': 0}]}).sort({'name': 1})   
    #+end_src
-** 6b
-   #+begin_src java
-   private void _6b() {
-    	AggregationOutput output = db.getCollection("business")
-				.aggregate(new ArrayList<>(Arrays.asList(
-						new BasicDBObject("$match",
-							new BasicDBObject("categories",
-								new BasicDBObject("$elemMatch", new BasicDBObject("$eq", "Restaurants")))),
-						new BasicDBObject("$group",
-								new BasicDBObject("_id", "$city")
-										.append("total", new BasicDBObject("$sum", 1))),
-						new BasicDBObject("$sort", new BasicDBObject("total", -1))
-				)));
+** Zadanie 1e
+   Określ, ile każde przedsiębiorstwo otrzymało wskazówek/napiwków(tip) w 2012.
+   Wynik posortuj alfabetycznie na podstawie liczby (tip).
+   #+begin_src js
+     // Wersja prostsza, ale wyświetlająca tylko business_
+     db.tip.aggregate([
+       {$match: {date: {$regex: /^2012-/}}},
+       {$group: { _id: "$business_id", cnt: { $sum: 1} }},
+       {$sort: {cnt: 1}}
+       ]); 
 
-    	for(DBObject object : output.results()) {
-			System.out.println(object);
-		}
-	}   
+     // Fajniejsza wersja, która zamiast business_id wyświetla nazwę biznesu.
+     // Z tym, że jest tak wolna, że nie doczekałem pełnego wykonania.
+     db.tip.aggregate([
+       {$match: {date: {$regex: /^2012-/}}},
+       {$group: { _id: "$business_id", cnt: { $sum: 1}}},
+       {$sort: {cnt: 1}}
+     ]).map(function(x) {
+        return {
+          "name": db.business.findOne({business_id: x._id}).name,
+          "tips": x.cnt
+        };
+     });
    #+end_src
-** 6c
-   #+begin_src java
-	private void _6c() {
-		AggregationOutput output = db.getCollection("business")
-				.aggregate(new ArrayList<>(Arrays.asList(
-						new BasicDBObject("$match",
-								new BasicDBObject()
-									.append("categories",
-											new BasicDBObject("$elemMatch",
-													new BasicDBObject("$eq", "Hotels")))
-									.append("attributes.Wi-Fi",
-											new BasicDBObject("$eq", "free"))
-									.append("stars",
-											new BasicDBObject("$gte", 4.5)))
-						,
-						new BasicDBObject("$group",
-								new BasicDBObject("_id", "$state")
-										.append("total", new BasicDBObject("$sum", 1))),
-						new BasicDBObject("$sort", new BasicDBObject("total", -1))
-				)));
-		
-		for(DBObject object : output.results()) {
-			System.out.println(object);
-		}
-	}   
-   #+end_src
-
-* Zadanie 7
-** W Robo3T
-   Teraz wystarczy pobrać użytkownika o id będącego pierwszym w rezultacie.
+** Zadanie 1f
+   Wyznacz, jaką średnia ocen(stars) uzyskała każda firma(business) na podstawie wszystkich recenzji.
+   Wynik ogranicz do recenzji, które uzyskały min 4.0 gwiazdki.
    #+begin_src js
    db.review.aggregate([
-     {$match: {stars: {$gte: 4.5}}},
-     {$group: { _id: "$user_id", total: { $sum: 1} }},
-     {$sort: {total: -1}}
-  ])
+       {$match: {stars: {$gte: 4.0}}},
+       {$group: { _id: "$business_id", average: { $avg: "$stars" }}}
+   ])
+
+   // Manualny join tak żeby było widać nazwę firmy.
+   // Wolne mocno.
+   db.review.aggregate([
+       {$match: {stars: {$gte: 4.0}}},
+       {$group: { _id: "$business_id", average: { $avg: "$stars" }}}
+   ]).map(function(x) {
+       return {
+           "name": db.business.findOne({business_id: x._id}).name,
+           "tips": x.average
+       };
+   });
    #+end_src
-   
-   #+begin_src java
-	private void _7(){
-		AggregationOutput output = db.getCollection("review")
-				.aggregate(new ArrayList<>(Arrays.asList(
-						new BasicDBObject("$match",
-								new BasicDBObject("stars",
-										new BasicDBObject("$gte", 4.5))),
-						new BasicDBObject("$group",
-								new BasicDBObject("_id", "$user_id")
-										.append("total", new BasicDBObject("$sum", 1))),
-						new BasicDBObject("$sort", new BasicDBObject("total", -1))
-				)));
-
-		Iterator<DBObject> iterator = output.results().iterator();
-		if(!iterator.hasNext()) {
-			System.out.println("ERROR: Unable to locate user.");
-			return;
-		}
-
-		DBObject first = iterator.next();
-		String userId = (String) first.get("_id");
-
-		Cursor cursor = db.getCollection("user")
-				.find(new BasicDBObject("user_id", userId));
-
-		if(cursor.hasNext()) {
-			System.out.println(cursor.next());
-			return;
-		}
-
-		System.out.println("ERROR: Unable to locate user.");
-	}   
+** Zadanie 1f
+   Usuń wszystkie firmy(business), które posiadają ocenę(stars) równą 2.0.
+   #+begin_src js
+   db.business.deleteMany({stars: 2.0})   
    #+end_src
 
-* Zadanie 8
-** Mongshell - mapReduce
+* Zadanie 2
+  Zdefiniuj funkcję (MongoDB) umożliwiającą dodanie nowej recenzji(review).
+  Wykonaj przykładowe wywołanie.
   #+begin_src js
-db.review.mapReduce(
-    function() { 
-        emit("counts", 
-            {
-                "funny" : this.votes.funny,
-                "useful": this.votes.useful,
-                "cool": this.votes.cool
-            }
-    )},
-    function(key, values) {
-        let summed = {"funny": 0, "useful": 0, "cool": 0};
-        for(let i=0; i<values.length; i++) {
-            summed["funny"] += values[i]["funny"];
-            summed["useful"] += values[i]["useful"];
-            summed["cool"] += values[i]["cool"];
+function newReview(business, user, stars, description) {
+    var argsOk = true;
+    
+    argsOk &= business !== null && business.business_id !== null && user !== null && user.user_id !== null;
+    argsOk &= [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].includes(stars)
+    
+    if(!argsOk){
+        return null;
+    }
+    
+    var review = {
+        votes: {funny: 0, useful: 0, cool: 0},
+        user_id: user.user_id,
+        business_id: business.business_id,
+        text: description,
+        type: "review",
+        // Ponieważ założyliśmy, że daty to stringi.
+        date: new Date().toString(),
+        stars: stars,
+        // Nie wiem w jaki sposób były generowane identyfikatory w oryginalnym zbiorze danych
+        // dlatego używam tutaj ObjectId(), które różni się długością od pozostalych ze zbioru danych.
+        review_id: new ObjectId().valueOf()
+    };
+    
+    var result = db.review.insert(review);
+    return (result.nInserted === 1) ? review : null; 
+}
 
-        }
-        return summed;
-    },
-    {out: "dbStats"}
-).find();
+// Przykładowe wywołanie
+var user = db.user.findOne();
+var business = db.business.findOne();
+newReview(business, user, 3.0, 'xDD');  
   #+end_src
 
-** Java
-   #+begin_src java
-	private void _8() {
-		DBCollection collection = db.getCollection("review");
+* Zadanie 3
+  Zdefiniuj funkcję (MongoDB), która zwróci wszystkie biznesy (business), w których w kategorii znajduje się podana przez użytkownika cechę.
+  Wartość kategorii należy przekazać do funkcji jako parametr.
+  Wykonaj przykładowe wywołanie zdefiniowanej funkcji.
 
-		String mapFunc =
-				"function() { \n" +
-						"        emit(\"counts\", \n" +
-						"            {\n" +
-						"                \"funny\" : this.votes.funny,\n" +
-						"                \"useful\": this.votes.useful,\n" +
-						"                \"cool\": this.votes.cool\n" +
-						"            }\n" +
-						"    )}";
-		String reduceFunc =
-				"function(key, values) {\n" +
-						"        let summed = {\"funny\": 0, \"useful\": 0, \"cool\": 0};\n" +
-						"        for(let i=0; i<values.length; i++) {\n" +
-						"            summed[\"funny\"] += values[i][\"funny\"];\n" +
-						"            summed[\"useful\"] += values[i][\"useful\"];\n" +
-						"            summed[\"cool\"] += values[i][\"cool\"];\n" +
-						"        }\n" +
-						"        return summed;\n" +
-						"    }";
-
-		MapReduceCommand mapRed =
-				new MapReduceCommand(collection, mapFunc, reduceFunc, null, MapReduceCommand.OutputType.INLINE, null);
-
-		MapReduceOutput output = collection.mapReduce(mapRed);
-		System.out.println(output.results().iterator().next());
-	}   
-   #+end_src
+  #+begin_src js
+  
+  #+end_src

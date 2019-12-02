@@ -10,12 +10,12 @@ case "$1" in
         ;;
     seed)
         # petla panie ferdku mowi to panu cos
-        docker exec $CNAME mongoimport --db lab4 --collection business --type json --file /dataset/yelp_academic_dataset_business.json
-        docker exec $CNAME mongoimport --db lab4 --collection checkin --type json --file /dataset/yelp_academic_dataset_checkin.json
-        # gigabajt. big data boża.
-        docker exec $CNAME mongoimport --db lab4 --collection review --type json --file /dataset/yelp_academic_dataset_review.json
         docker exec $CNAME mongoimport --db lab4 --collection tip --type json --file /dataset/yelp_academic_dataset_tip.json
         docker exec $CNAME mongoimport --db lab4 --collection user --type json --file /dataset/yelp_academic_dataset_user.json
+        # gigabajt. big data boża.
+        docker exec $CNAME mongoimport --db lab4 --collection review --type json --file /dataset/yelp_academic_dataset_review.json
+        docker exec $CNAME mongoimport --db lab4 --collection business --type json --file /dataset/yelp_academic_dataset_business.json
+        docker exec $CNAME mongoimport --db lab4 --collection checkin --type json --file /dataset/yelp_academic_dataset_checkin.json
         ;;
     *)
         docker pull mongo
