@@ -1,7 +1,8 @@
-#+TITLE: MongoDB - Praca domowa
-#+Author: Dawid Macek
+#+TITLE: MongoDB - Zadania domowe
+#+SUBTITLE: Dawid Macek
+#+Author: Data laboratorium: 27.11.2019 | Data wykonania: 03.12.2019
 #+LANGUAGE: pl
-#+OPTIONS: date:nil
+#+OPTIONS: date:nil, num:nil, toc:nil
 #+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
 #+LATEX_HEADER: \usepackage[AUTO]{babel}
 #+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
@@ -12,14 +13,16 @@
   Z tego powodu daty importowane są jak stringi.
   Typy można łatwo skonwertować odpowiednio updatując obiekty, ale ja zostałem przy datach reprezentowanych jako stringi.
 
-  #+end_src
 * Zadanie 1
   Wykorzystując bazę danych *yelp dataset* wykonaj zapytanie i komendy MongoDB, aby uzyskać następujące rezultaty.
 ** Zadanie 1a
    Zwróć bez powtórzeń wszystkie nazwy miast w których znajdują się firmy(business).
    Wynik posortuj na podstawie nazwy miasta alfabetycznie.
    #+begin_src js
-     db.business.distinct('city').sort()   
+db.business.aggregate([
+    {$group: {_id: "$city"}},
+    {$sort: {_id: 1}}
+])
    #+end_src
 ** Zadanie 1b
    Zwróć liczbę wszystkich recenzji, które pojawiły się po 2011 roku (włącznie).
@@ -27,10 +30,9 @@
      // Zliczanie w Mongo bardzo wolne.
      // .find() zwraca poprawne rezultaty
      // Nie doczekałem do zakończenia .count(), ale jestem przekonany że zapytanie jest poprawne.
-     db.review.find({$where: 'function() { return new Date(this.date).getFullYear() >= 2011}'}).count()
-
-     // Można też próbować agregacją, z tym że w tam nie można używać $where.
-     // Trzebaby jakoś przekonwertować liczbę przed pierwszym myślnikiem i ją sprawdzać.
+     db.review
+         .find({$where: 'function() { return new Date(this.date).getFullYear() >= 2011}'})
+         .count()
    #+end_src
 ** Zadanie 1c
    Zwróć dane wszystkich zamkniętych(open) firm(business) z pól: nazwa, adres, gwiazdki (stars).
@@ -49,7 +51,7 @@
    #+begin_src js
      // Wersja prostsza, ale wyświetlająca tylko business_id
      db.tip.aggregate([
-       {$match: {date: {$regex: /^2012-/}}},
+       {$match: {date: {$regex: "^2012-*"}}},
        {$group: { _id: "$business_id", cnt: { $sum: 1} }},
        {$sort: {cnt: 1}}
      ]); 
@@ -57,7 +59,7 @@
      // Fajniejsza wersja, która zamiast business_id wyświetla nazwę biznesu.
      // Z tym, że jest tak wolna, że nie doczekałem pełnego wykonania.
      db.tip.aggregate([
-       {$match: {date: {$regex: /^2012-/}}},
+       {$match: {date: {$regex: "^2012-*"}}},
        {$group: { _id: "$business_id", cnt: { $sum: 1}}},
        {$sort: {cnt: 1}}
      ]).map(function(x) {
@@ -88,7 +90,7 @@
        };
    });
    #+end_src
-** Zadanie 1f
+** Zadanie 1g
    Usuń wszystkie firmy(business), które posiadają ocenę(stars) równą 2.0.
    #+begin_src js
    db.business.deleteMany({stars: 2.0})   
@@ -101,7 +103,8 @@
 function newReview(business, user, stars, description) {
     var argsOk = true;
     
-    argsOk &= business !== null && business.business_id !== null && user !== null && user.user_id !== null;
+    argsOk &= business !== null && business.business_id !== null;
+    argsOk &= user !== null && user.user_id !== null;
     argsOk &= [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0].includes(stars)
     
     if(!argsOk){
@@ -117,8 +120,9 @@ function newReview(business, user, stars, description) {
         // Ponieważ założyliśmy, że daty to stringi.
         date: new Date().toString(),
         stars: stars,
-        // Nie wiem w jaki sposób były generowane identyfikatory w oryginalnym zbiorze danych
-        // dlatego używam tutaj ObjectId(), które różni się długością od pozostalych ze zbioru danych.
+        // Nie wiem w jaki sposób były generowane identyfikatory w oryginalnym zbiorze danych.
+        // Dlatego używam tutaj ObjectId(), które różni się długością od pozostałych
+        // identyfikatorów.
         review_id: new ObjectId().valueOf()
     };
     
@@ -134,9 +138,408 @@ newReview(business, user, 3.0, 'xDD');
 
 * Zadanie 3
   Zdefiniuj funkcję (MongoDB), która zwróci wszystkie biznesy (business), w których w kategorii znajduje się podana przez użytkownika cechę.
-  Wartość kategorii należy przekazać do funkcji jako parametr.
+  Wartość kategorii należy przekazać do funkcji jako parametr.b
   Wykonaj przykładowe wywołanie zdefiniowanej funkcji.
 
   #+begin_src js
-  
+function byCategory(categoryName) {
+    return db.business.find({categories: {$elemMatch: {$eq: categoryName}}});
+}
+byCategory("Hotels");  
   #+end_src
+
+* Zadanie 4
+  Zdefiniuj funkcję (MongoDB), która umożliwi modyfikację nazwy użytkownika (user) na podstawie podanego id.
+  Id oraz nazwa mają być przekazywane jako parametry.
+  
+  #+begin_src js
+function updateName(userId, newName) {
+  var user = db.user.findOne({"user_id": userId});
+  if(user === null) {
+        return null;
+  }
+  user.name = newName;
+  var result = db.user.save(user);
+  return (result.nMatched === 1) ? user : null;
+}
+
+// Wywołanie
+updateName("MWhR9LvOdRbqtu1I_DRFBg", "Marianek");  
+  #+end_src
+
+* Zadanie 5
+  Zwróć średnią ilość wszystkich wskazówek/napiwków dla każdego z biznesów, wykorzystaj map reduce.
+  #+begin_src js
+// Nie bardzo rozumiem polecenie.
+// Średnia ilość tipów dla konkretnego biznesu to po prostu właśnie ta ilość.
+// Czyli wystarczy policzyć ile każdy biznes dostał tipów.
+db.tip.mapReduce(
+  function() { emit(this.business_id, 1) },
+  function(key, values) {
+      return values.length;
+   }, { out: "out" }
+).find() 
+
+// Wydaje mi się, że chodziło o średnią z recenzji, dlatego poniżej rozwiązanie tego.
+db.review.mapReduce(
+    function() { emit(this.business_id, this.stars) },
+    function(key, values) {
+        var total = values.length;
+        var sum = 0;
+        for(var i=0; i<total; i++){
+            sum += values[i];
+        }
+        return sum/total;
+     },
+    { out: "out" }
+).find()
+  #+end_src
+
+* Zadanie 6
+  Odwzoruj wszystkie zadania z punktu 1 w języku programowania (np. JAVA) z pomocą API do MongoDB.
+  Wykorzystaj dla każdego zadania odrębną metodę.
+
+** Szablon
+   Rozwiązanie w języku [[https://www.rust-lang.org/][Rust]].
+   Korzystam z biblioteki [[https://docs.rs/mongodb][mongodb]].
+   #+begin_src rust
+use mongodb::{
+    ThreadedClient,
+    Client,
+    Bson,
+    bson, doc
+};
+
+static HOSTNAME: &str = "localhost";
+static PORT: u16 = 27017;
+static DB: &str = "lab4";
+
+fn main() {
+    let client = Client::connect(HOSTNAME, PORT)
+        .expect("Failed to initialize client.");
+    
+    let db = client.db(DB);
+    
+    _a(&db);
+    _b(&db);
+    _c(&db);
+    _d(&db);
+    _e(&db);
+    _f(&db);
+    _g(&db);
+}
+
+fn _a(db: &Database) {}
+fn _b(db: &Database) {}
+fn _c(db: &Database) {}
+fn _d(db: &Database) {}
+fn _e(db: &Database) {}
+fn _f(db: &Database) {}
+fn _g(db: &Database) {}   
+   #+end_src
+** Zadanie 6a
+   Zwróć bez powtórzeń wszystkie nazwy miast w których znajdują się firmy(business).
+   Wynik posortuj na podstawie nazwy miasta alfabetycznie.
+   #+begin_src rust
+fn _a(db: &Database) {
+    db.collection("business")
+        .aggregate(vec![
+            doc! {"$group": {"_id": "$city"}},
+            doc! {"$sort": {"_id": 1}}
+        ], None)
+        .unwrap()
+        .for_each(|item| {
+            let name = {
+                let unwrapped = item.unwrap();
+                let city = unwrapped.get_str("_id").unwrap();
+                String::from(city)
+            };
+            println!("{}", name)
+        });
+}   
+   #+end_src
+
+** Zadanie 6b
+   Zwróć liczbę wszystkich recenzji, które pojawiły się po 2011 roku (włącznie).
+   #+begin_src rust
+fn _b(db: &Database) {
+    let query = doc! { "$where":
+                        "function() { return new Date(this.date).getFullYear() >= 2011}"};
+    let count = db.collection("review")
+        .find(Some(query), None)
+        // Otrzymujemy kursor, który implementuje cechę 'Iterator'
+        .unwrap()
+        // Więc możemy zliczyć ilość otrzymanych obiektów.
+        .count();
+    println!("{}", count);
+}   
+   #+end_src
+** Zadanie 6c
+   Zwróć dane wszystkich zamkniętych(open) firm(business) z pól: nazwa, adres, gwiazdki (stars).
+   #+begin_src  rust
+fn _c(db: &Database) {
+    let query = doc! {"open": false};
+    let projection = doc! {"name": 1, "full_address": 1, "stars": 1};
+    let options = FindOptions {
+        projection: Some(projection),
+        ..Default::default()
+    };
+    db.collection("business")
+        .find(Some(query), Some(options))
+        .unwrap()
+        .for_each(|item| {
+            let unwraped = item.unwrap();
+            let name = unwraped.get_str("name")
+                .unwrap();
+            let full_address = unwraped.get_str("full_address")
+                .unwrap();
+            let stars = unwraped.get_f64("stars")
+                .unwrap();
+
+            println!("Name: {}, Address: {}, Stars: {}",
+                     name, full_address, stars)
+        });
+}   
+   #+end_src
+** Zadanie 6d
+   Zwróć dane wszystkich użytkowników(user), którzy nie uzyskali ani jednego pozytywnego głosu z kategorii(funny lub useful), 
+   wynik posortuj alfabetycznie na podstawie imienia użytkownika.
+   #+begin_src rust
+fn _d(db: &Database) {
+    let query = doc! {"$and": [{"votes.funny": 0}, {"votes.useful": 0}]};
+    let sort = doc! {"name": 1};
+    let options = FindOptions {
+        sort: Some(sort),
+        ..Default::default()
+    };
+    db.collection("user")
+        .find(Some(query), Some(options))
+        .unwrap()
+        .for_each(|item| {
+            println!("{:?}", item.unwrap());
+        });
+}   
+   #+end_src
+** Zadanie 6e
+   Określ, ile każde przedsiębiorstwo otrzymało wskazówek/napiwków(tip) w 2012.
+   Wynik posortuj alfabetycznie na podstawie liczby (tip).
+   #+begin_src rust
+fn _e(db: &Database) {
+    db.collection("tip")
+        .aggregate(vec![
+            doc! {"$match": {"date": {"$regex": "^2012-*"}}},
+            doc! {"$group": {"_id": "$business_id", "cnt": {"$sum": 1}}},
+            doc! {"$sort": {"cnt": 1}}
+        ], None)
+        .unwrap()
+        .for_each(|item| {
+            println!("{:?}", item.unwrap());
+        });
+}   
+   #+end_src
+** Zadanie 6f
+   Wyznacz, jaką średnia ocen(stars) uzyskała każda firma(business) na podstawie wszystkich recenzji.
+   Wynik ogranicz do recenzji, które uzyskały min 4.0 gwiazdki.
+   #+begin_src rust
+fn _f(db: &Database) {
+    db.collection("review")
+        .aggregate(vec![
+            doc! {"$match": {"stars" : {"$gte": 4.0}}},
+            doc! {"$group": {"_id": "$business_id", "avg": {"$avg": "$stars"}}},
+        ], None)
+    .unwrap()
+    .for_each(|item| {
+        println!("{:?}", item.unwrap());
+    });
+}   
+   #+end_src
+** Zadanie 6g
+   Usuń wszystkie firmy (business), które posiadają ocenę (stars) równą 2.0.
+   #+begin_src rust
+fn _g(db: &Database) -> i32 {
+    let filter = doc! {"stars" : 2.0};
+
+    // Zwracamy ilość usuniętych obiektów. Jeśli wystąpił błąd to zwracamy 0.
+    db.collection("business")
+        .delete_many(filter, None)
+        .map(|result| result.deleted_count)
+        .unwrap_or(0)
+}   
+   #+end_src
+
+* Zadanie 7
+  Zaproponuj bazę danych składającą się z 3 kolekcji pozwalającą przechowywać dane dotyczące: klientów, zakupu oraz przedmiotu zakupu.
+  W bazie wykorzystaj: pola proste, złożone i tablice.
+  Zaprezentuj strukturę dokumentów w formie JSON dla przykładowych danych.
+
+** Schemat
+  #+begin_src js
+// Klient
+{
+  _id: ObjectId
+  // Dane logowania
+  name: String,
+  password: String,
+  // Data rejestracji
+  registered_at: Date,
+  // Tablica obserwowanych produktów
+  observed: [ObjectId]
+  // Adres zamieszkania
+  address: {
+    building_number: Int32,
+    street: String,
+    city: String,
+    country: String
+  }
+}
+// Przedmiot
+{
+  _id: ObjectId,
+  // Podstawowe informacje o produkcie
+  tile: String,
+  description: String,
+  price: Double, 
+  qty: Int32,
+  // Tablica recenzji produktu
+  reviews: [
+    {user_id: ObjectId, stars: Double, text: String}
+  ]
+}
+// Zamówienie
+{
+  _id: ObjectId,
+  // Użytkownik składający zamówienie.
+  user_id: ObjectId,
+  // Data potwierdzenia zamówienia
+  date: Date,
+  // Zamówienie może składać się z wielu produktów
+  items: [
+    { product_id: ObjectId, qty: Int32 }
+  ]
+}
+#+end_src
+** Seedowanie
+
+#+begin_src
+// Klienci
+db.clients.insertMany([
+{
+    name: "Sanjaya",
+    password: "miłar",
+    registered_at: new Date(),
+    observed: [],
+    address: {
+        building_number: 21,
+        street: "Krótka",
+        city: "Nysa",
+        country: "Wielka Lehja"
+    }
+},
+{
+    name: "Miłar",
+    password: "qwerty",
+    registered_at: new Date(),
+    observed: [],
+    address: {
+        building_number: 22,
+        street: "Krótka",
+        city: "Nysa",
+        country: "Wielka Lehja"
+    }
+},
+{
+    name: "Barmir",
+    password: "wwww",
+    registered_at: new Date(),
+    observed: [],
+    address: {
+        building_number: 20,
+        street: "Długa",
+        city: "Nysa",
+        country: "Wielka Lehja"
+    }
+}
+])
+
+// Produkty
+db.products.insertMany([
+{
+    title: "Deparchator Turbo XL",
+    description: "Mamy do czynienia z inwazją Mossadu. Jest ich w tej chwili w Polsce [...].",
+    price: 5000.0,
+    qty: 10,
+    reviews: [
+        { 
+          user_id: ObjectId("5de678f96edf49c3578336f9"),
+          stars: 5.0,
+          text: "Pomaga wykrywać agentów ciemnej strony mocy." 
+        }
+    ]
+},
+{
+    title: "Woda plazmowa 5L",
+    description: "Jest to czysta woda pobierana ze źródła 'Kończanka', pozbawiona [...]",
+    price: 250.0,
+    qty: 1000,
+    reviews: [
+        { 
+          user_id: ObjectId("5de678f96edf49c3578336f9"),
+          stars: 5.0,
+          text: "Woda jest ekstra. Piję ją u siebie na działce. Wege moc." 
+        },
+        { 
+          user_id: ObjectId("5de678f96edf49c3578336fb"), 
+          stars: 1.0, 
+          text: "Widać, że sprzedawca ma słabe zdrowie. Prawdopodobnie agent."
+        }
+    ]
+}
+])
+
+// Zamówienia
+db.orders.insertMany([
+{
+    user_id: ObjectId("5de678f96edf49c3578336f9"),
+    date: new Date(),
+    items: [
+        // Jeden deparchator
+        { product_id: ObjectId("5de67b806edf49c3578336fc"), qty: 1 },
+        // 25l wody plazmowej
+        { product_id: ObjectId("5de67b806edf49c3578336fd"), qty: 5 }
+    ]
+},
+{
+    user_id: ObjectId("5de678f96edf49c3578336f9"),
+    date: new Date(),
+    items: [
+        // 5l wody plazmowej
+        { product_id: ObjectId("5de67b806edf49c3578336fd"), qty: 1 }
+    ]
+},
+{
+    user_id: ObjectId("5de678f96edf49c3578336fb"),
+    date: new Date(),
+    items: [
+        // 10l wody plazmowej
+        { product_id: ObjectId("5de67b806edf49c3578336fd"), qty: 2}
+    ]
+},
+{
+    user_id: ObjectId("5de678f96edf49c3578336fa"),
+    date: new Date(),
+    items: [
+        // jeden deparchator
+        { product_id: ObjectId("5de67b806edf49c3578336fc"), qty: 1 }
+    ]
+}
+])
+  #+end_src
+
+#+CAPTION: Kolekcja klientów
+[[./imgs/1.png]]
+
+#+CAPTION: Kolekcja produktów
+[[./imgs/2.png]]
+
+#+CAPTION: Kolekcja zamówień
+[[./imgs/3.png]]

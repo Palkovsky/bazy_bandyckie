@@ -7,3 +7,4 @@ lab4/dataset
 lab4/.*
 lab4/bin
 lab4/*.iml
+lab4/zad6/target/*
