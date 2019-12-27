@@ -14,7 +14,8 @@ fn main() -> Res<()> {
 }
 
 fn zadanie3(graph: &mut GraphClient) -> Res<()> {
-    let result = graph.exec("MATCH (n:Movie) RETURN n.title, n.tagline, n.released LIMIT 25")?;
+    let result = graph.exec(
+        "MATCH (n:Movie) WHERE n.released > 2000 RETURN n.title, n.tagline, n.released LIMIT 25")?;
 
     for row in result.rows() {
         let (title, tagline, release) =

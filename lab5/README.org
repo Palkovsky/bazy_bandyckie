@@ -100,7 +100,9 @@ wynik).
 
    #+begin_src rust
 fn zadanie3(graph: &mut GraphClient) -> Res<()> {
-    let result = graph.exec("MATCH (n:Movie) RETURN n.title, n.tagline, n.released LIMIT 25")?;
+   let result = graph.exec(
+        "MATCH (n:Movie) WHERE n.released > 2000 RETURN n.title, n.tagline, n.released LIMIT 25")?;
+
 
     for row in result.rows() {
         let (title, tagline, release) =
@@ -115,6 +117,6 @@ fn zadanie3(graph: &mut GraphClient) -> Res<()> {
 }
    #+end_src
 
-** Wynik działania - częściowo ucięty
+** Wynik działania
 
 [[./imgs/1.png]]
