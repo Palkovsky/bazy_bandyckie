@@ -1,0 +1,8 @@
+[package]
+name = "rs-neo4j"
+version = "0.1.0"
+authors = ["Palkovsky <dawidmacek42@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+rusted_cypher = "1.1.0"

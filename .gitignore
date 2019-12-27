@@ -8,3 +8,6 @@ lab4/.*
 lab4/bin
 lab4/*.iml
 lab4/zad6/target/*
+
+lab5/rs-neo4j/target/*
+lab5/data/*

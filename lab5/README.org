@@ -1,0 +1,120 @@
+#+TITLE: Neo4j - Sprawozdanie
+#+SUBTITLE: Dawid Macek
+#+LANGUAGE: pl
+#+OPTIONS: date:nil, num:nil, toc:nil
+#+LATEX_HEADER: \renewcommand*{\contentsname}{Spis treści}
+#+LATEX_HEADER: \usepackage[AUTO]{babel}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
+#+HTML_HEAD: <style>pre.src {background-color: #303030; color: #e5e5e5;}</style>
+
+* Zadanie 1
+  Bazę odpalam w kontenerze.
+  Do zarządzania nim używam poniższego skryptu:
+
+  #+begin_src bash
+  #!/bin/bash
+  CNAME="neo4j_node"
+  case "$1" in
+      tty)
+          docker exec -it $CNAME /bin/bash
+          ;;
+      kill)
+          docker kill $CNAME
+          ;;
+      *)
+          docker pull neo4j
+          docker run \
+                 --name $CNAME --rm \
+                 -p 7687:7687 -p 7474:7474 \
+                 -v /$(pwd)/data:/data \
+                 --env=NEO4J_AUTH=none \
+                 --env=NEO4J_dbms_allow__upgrade=true \
+                 neo4j
+          ;;
+  esac
+  #+end_src
+
+  Opcja ~tty~ nie działa na Windowsie z emulatorem  ~Git Bash~, ale w zadaniach nie ma potrzeby majstrowania przy kontenerach.
+
+* Zadanie 2
+  Po prostu przekleiłem trzy kolejne zapytania.
+
+** Filmy
+  #+begin_src 
+LOAD CSV WITH HEADERS FROM 
+  'https://neo4j.com/docs/cypher-manual/3.5/csv/query-tuning/movies.csv'  AS line
+MERGE (m:Movie { title: line.title })
+ON CREATE SET m.released = toInteger(line.released), m.tagline = line.tagline
+  #+end_src
+
+** Aktorzy
+  #+begin_src 
+LOAD CSV WITH HEADERS FROM 
+  'https://neo4j.com/docs/cypher-manual/3.5/csv/query-tuning/actors.csv' AS line
+MATCH (m:Movie { title: line.title })
+MERGE (p:Person { name: line.name })
+ON CREATE SET p.born = toInteger(line.born)
+MERGE (p)-[:ACTED_IN { roles:split(line.roles, ';')}]->(m)
+  #+end_src
+
+** Reżyserzy
+  #+begin_src 
+LOAD CSV WITH HEADERS FROM 
+  'https://neo4j.com/docs/cypher-manual/3.5/csv/query-tuning/directors.csv' AS line
+MATCH (m:Movie { title: line.title })
+MERGE (p:Person { name: line.name })
+ON CREATE SET p.born = toInteger(line.born)
+MERGE (p)-[:DIRECTED]->(m)
+  #+end_src
+  
+* Zadanie 3
+
+Zadania z językiem programowania rozwiązuję w [[https://www.rust-lang.org/][Ruście]] używając biblioteki [[https://docs.rs/rusted_cypher/1.1.0/rusted_cypher/][rusted​_cypher]].
+
+** Framework do zoadań
+   #+begin_src rust
+    use rusted_cypher::GraphClient;
+    use rusted_cypher::error::GraphError;
+
+    type Res<T> = Result<T, GraphError>;
+
+    const CONN_URL: &'static str = "http://neo4j:neo4j@localhost:7474/db/data";
+
+    fn main() -> Res<()> {
+        let mut graph = GraphClient::connect(CONN_URL)?;
+
+        zadanie(&mut graph)?;
+
+        Ok(())
+    }
+
+    fn zadanie(graph: &mut GraphClient) -> Res<()> {
+        // miejsce na kod
+        Ok(())
+    }
+   #+end_src
+
+** Rozwiązanie
+   Zaimplementować funkcję (wystarczy wykonać jedno zapytanie typu MATCH WHERE i wyświetlić
+wynik).    
+
+   #+begin_src rust
+fn zadanie3(graph: &mut GraphClient) -> Res<()> {
+    let result = graph.exec("MATCH (n:Movie) RETURN n.title, n.tagline, n.released LIMIT 25")?;
+
+    for row in result.rows() {
+        let (title, tagline, release) =
+            (row.get::<String>("n.title")?,
+             row.get::<String>("n.tagline")?,
+             row.get::<usize>("n.released")?);
+
+        println!("{} | {}\r\n{}\r\n--------", title, release, tagline);
+    }
+
+    Ok(())
+}
+   #+end_src
+
+** Wynik działania - częściowo ucięty
+
+[[./imgs/1.png]]
