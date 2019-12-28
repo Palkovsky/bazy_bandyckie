@@ -7,6 +7,9 @@
 #+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
 #+HTML_HEAD: <style>pre.src {background-color: #303030; color: #e5e5e5;}</style>
 
+* Wstęp
+  Gdyby brak kolorowania składnii przeszkadzał w sprawdzaniu to tutaj link do wersji z działającym kolorowaniem:
+  https://github.com/Palkovsky/bazy_bandyckie/tree/master/lab5
 * Zadanie 1
   Bazę odpalam w kontenerze.
   Do zarządzania nim używam poniższego skryptu:
@@ -207,7 +210,6 @@ fn zadanie5(graph: &mut GraphClient) -> Res<()> {
 ** Wynik
    [[./imgs/3.png]]
 
-
 * Zadanie 6
   Dla filmów wydanych po roku dwutysięcznym do tytułu dopiszemy rok wydania.
   Na przykład:
@@ -328,7 +330,7 @@ fn zadanie9(graph: &mut GraphClient) -> Res<()> {
 ** Wynik
    Można porównać z wynikiem poprzedniego zapytania. 
    Węzły na drugich miejscach są to filmy ~A Few Good Men~ i ~Something's Gotta Give~.
-   Tak się złożyło, że najkrótsza ścieżka jest jedyna i ma długość 4.
+   Tak się złożyło, że najkrótsza ścieżka między Kevinem Baconem i Keanu Reevesem ma długość 4 i jest jedyna.
    [[./imgs/8.png]]
 
 * Zadanie 11
@@ -404,4 +406,153 @@ Będziemy zajmować się poniższym zapytaniem:
     Dla zapytań przedziałowych indeksy nie dają aż tak dobrych rezultatów jak dla zapytań z równością, bo egzekutor wciąż musi wyszukiwać przez połowienie.
     Niemniej jednak, przyśpieszenie cały czas występuje.
 
-* Zadnie 13
+* Zadanie 13
+** Algorytm
+   - Pobieramy z bazy wszystkie pary (a.id, b.id) reprezentujące krawędzie grafu.
+   - Generujemy przykładowe drzewo rozpinające za pomocą DFSa.
+   - Jeśli nie udało się przejść po wszystkich wierzchołkach to graf niespójny, czyli zwracamy błąd.
+   - W przeciwnym wypadku zwracamy to co wygenerował DFS.
+
+** Kod
+   W kodzie zakładam, że krawędzie są nieskierowane.
+   Aby to zmienić wystarczy przy inicjalizacji zmiennej ~edges~ nie dodawać odwróconej krotki.
+   #+begin_src rust
+fn zadanie13(graph: &mut GraphClient) -> Res<(HashSet<usize>, HashSet<(usize, usize)>)> {
+    let result = graph.exec("MATCH (a)-[r]-(b) RETURN ID(a) AS id_a, ID(b) AS id_b")?;
+
+    // HashSet containing all graph edges.
+    let mut edges: HashSet<(usize, usize)> = result
+        .rows()
+        .map(|row| (row.get("id_a").unwrap(), row.get("id_b").unwrap()))
+        .fold(HashSet::new(), |mut acc, x| {
+            acc.insert(x);
+            // Line below makes all edges bidirectional
+            acc.insert((x.1, x.0));
+            acc
+        });
+
+    // Map of (id: bool). Boolean value tells whether the node was visited or not.
+    let mut vertexes = edges
+        .clone()
+        .into_iter()
+        .fold(HashMap::<usize, bool>::new(), |mut acc, x| {
+            acc.insert(x.0, false);
+            acc.insert(x.1, false);
+            acc
+        });
+
+    // Count nodes
+    let node_count = vertexes.keys().len();
+
+    // Generate tree
+    let (nodes, edges) = dfs_st(*vertexes.keys().next().unwrap(),
+                                None,
+                                &mut vertexes,
+                                &mut edges);
+    println!("NODES");
+    println!("{:?}", nodes);
+    println!("EDGES");
+    println!("{:?}", edges);
+
+    // Check if DFS have traversed all nodes.
+    // If didn't it means that graph is disconnected, in thay case return error.
+    if nodes.len() != node_count {
+        return Err(GraphError::from("Graph disconnected.".to_string()));
+    }
+
+    // Preety-print edges.
+    // This should be moved out of this method probably.
+    edges.iter().for_each(|(n, m)| {
+        let q = Statement::new(
+            "MATCH (n), (m) WHERE ID(n)={id1} AND ID(m)={id2} RETURN n.name, m.name"
+            )
+            .with_param("id1", n).unwrap()
+            .with_param("id2", m).unwrap();
+
+        for row in graph.exec(q).unwrap().rows() {
+            let (name1, name2) =
+                (row.get::<String>("n.name").unwrap(),
+                 row.get::<String>("m.name").unwrap());
+
+            println!("----------\r\n{} | {}", name1, name2);
+        }
+    });
+
+    // Return nodes and edges of spanning tree.
+    Ok((nodes, edges))
+}
+
+fn dfs_st(node: usize,
+          from: Option<usize>,
+          vertexes: &mut HashMap<usize, bool>,
+          edges: &mut HashSet<(usize, usize)>) -> (HashSet<usize>, HashSet<(usize, usize)>) {
+
+    // When node already visited, return neutral elements.
+    let visited = *vertexes.get(&node).unwrap();
+    if visited {
+        return (HashSet::new(), HashSet::new())
+    }
+
+    // Generate neighbours set.
+    let neighbours: HashSet<usize> = edges
+        .iter()
+        // Ignore edges without current node
+        .filter(|&(key, value)| *key == node || *value == node)
+        // Get node on other side of the edge
+        .map(|(key, value)| {
+            if node == *key { *value }
+            else { *key }
+        })
+        // Filter out visited neighbours
+        .filter(|neighbour| !*vertexes.get(&neighbour).unwrap())
+        .collect();
+
+    // Mark current node as visited.
+    vertexes.insert(node, true);
+
+    let mut f_nodes = HashSet::new();
+    let mut f_edges = HashSet::new();
+
+    f_nodes.insert(node);
+    if let Some(from) = from {
+        f_edges.insert((from, node));
+        f_edges.insert((node, from));
+    }
+
+    // Run dfs_st on neighbourin nodes and join results.
+    neighbours.iter()
+        .map(|neighbour| dfs_st(*neighbour, Some(node), vertexes, edges))
+        .for_each(|(g_nodes, g_edges)| {
+            f_nodes.extend(g_nodes);
+            f_edges.extend(g_edges);
+        });
+
+    return (f_nodes, f_edges);
+}
+   #+end_src
+
+** Dane
+   Dla danych z poprzednich zadań otrzymujemy błąd informujący o niespójności grafu.
+   Poniżej przykładowe dane na których można wygenerować drzewo rozpinajace:
+
+   #+begin_src    
+CREATE 
+(p1: Person {name: "p1"})-[:KNOWS]->
+(p2: Person {name: "p2"})-[:KNOWS]->
+(p3: Person {name: "p3"})-[:KNOWS]->
+(p4: Person {name: "p4"})-[:KNOWS]->(p1)
+
+MATCH (p1: Person {name: "p1"}), (p3: Person {name: "p3"})
+CREATE (p1)-[:KNOWS]->(p3)
+
+MATCH (p1: Person {name: "p1"}), (p2: Person {name: "p2"})
+CREATE (p1)<-[:KNOWS]-(p4: Person {name: "p4"})-[:KNOWS]->(p2)
+   #+end_src
+
+   [[./imgs/13a.png]]
+
+** Wynik
+   [[./imgs/13c.png]]
+
+   Krawędzie drzewa zaznaczone czarnym kolorem, można porównać z wynikami powyżej.
+   [[./imgs/13b.png]]

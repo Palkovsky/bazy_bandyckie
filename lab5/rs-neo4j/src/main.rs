@@ -5,6 +5,8 @@ use rusted_cypher::error::GraphError;
 
 use indoc::indoc;
 
+use std::collections::{ HashSet, HashMap };
+
 type Res<T> = Result<T, GraphError>;
 
 const CONN_URL: &'static str = "http://neo4j:neo4j@localhost:7474/db/data";
@@ -19,9 +21,122 @@ fn main() -> Res<()> {
     // zadanie7a(&mut graph)?;
     // zadanie7b(&mut graph)?;
     // zadanie9(&mut graph)?;
-    zadanie10(&mut graph)?;
+    // zadanie10(&mut graph)?;
+    zadanie13(&mut graph)?;
 
     Ok(())
+}
+
+fn zadanie13(graph: &mut GraphClient) -> Res<(HashSet<usize>, HashSet<(usize, usize)>)> {
+    let result = graph.exec("MATCH (a)-[r]-(b) RETURN ID(a) AS id_a, ID(b) AS id_b")?;
+
+    // HashSet containing all graph edges.
+    let mut edges: HashSet<(usize, usize)> = result
+        .rows()
+        .map(|row| (row.get("id_a").unwrap(), row.get("id_b").unwrap()))
+        .fold(HashSet::new(), |mut acc, x| {
+            // Assume everyting is bidirectional
+            acc.insert(x);
+            acc.insert((x.1, x.0));
+            acc
+        });
+
+    // Map of (id: bool). Boolean value tells whether the node was visited or not.
+    let mut vertexes = edges
+        .clone()
+        .into_iter()
+        .fold(HashMap::<usize, bool>::new(), |mut acc, x| {
+            acc.insert(x.0, false);
+            acc.insert(x.1, false);
+            acc
+        });
+
+    // Count nodes
+    let node_count = vertexes.keys().len();
+
+    // Generate tree
+    let (nodes, edges) = dfs_st(*vertexes.keys().next().unwrap(),
+                                None,
+                                &mut vertexes,
+                                &mut edges);
+    println!("NODES");
+    println!("{:?}", nodes);
+    println!("EDGES");
+    println!("{:?}", edges);
+
+    // Check if DFS had traversed all nodes.
+    // If didn't it means that graph is disconnected, in this case return error.
+    if nodes.len() != node_count {
+        return Err(GraphError::from("Graph disconnected.".to_string()));
+    }
+
+    edges.iter().for_each(|(n, m)| {
+        let q = Statement::new(
+            "MATCH (n), (m) WHERE ID(n)={id1} AND ID(m)={id2} RETURN n.name, m.name"
+            )
+            .with_param("id1", n).unwrap()
+            .with_param("id2", m).unwrap();
+
+        for row in graph.exec(q).unwrap().rows() {
+            let (name1, name2) =
+                (row.get::<String>("n.name").unwrap(),
+                 row.get::<String>("m.name").unwrap());
+
+            println!("----------\r\n{} | {}", name1, name2);
+        }
+    });
+
+    // Return nodes and edges of spanning tree.
+    Ok((nodes, edges))
+}
+
+fn dfs_st(node: usize,
+          from: Option<usize>,
+          vertexes: &mut HashMap<usize, bool>,
+          edges: &mut HashSet<(usize, usize)>) -> (HashSet<usize>, HashSet<(usize, usize)>) {
+
+    let visited = *vertexes.get(&node).unwrap();
+
+    // When node already visited return neutral elements.
+    if visited {
+        return (HashSet::new(), HashSet::new())
+    }
+
+    // Generate neighbours set.
+    let neighbours: HashSet<usize> = edges
+        .iter()
+        .filter(|&(key, value)| *key == node || *value == node)
+        .map(|(key, value)| {
+            if node == *key { *value }
+            else { *key }
+        })
+        // Filter out visited neighbours
+        .filter(|neighbour| !*vertexes.get(&neighbour).unwrap())
+         // Create set of neighbour nodes.
+        .collect();
+
+    // Mark current node as visited.
+    vertexes.insert(node, true);
+
+    let mut f_nodes = HashSet::new();
+    let mut f_edges = HashSet::new();
+
+    f_nodes.insert(node);
+    if let Some(from) = from {
+        f_edges.insert((from, node));
+        f_edges.insert((node, from));
+    }
+
+    // Run dfs_st on neighbours and join results.
+    neighbours
+        .iter()
+        .map(|neighbour| dfs_st(*neighbour, Some(node), vertexes, edges))
+        .for_each(|(g_nodes, g_edges)| {
+            f_nodes.extend(g_nodes);
+            f_edges.extend(g_edges);
+        });
+
+    return (f_nodes, f_edges);
 }
 
 fn zadanie10(graph: &mut GraphClient) -> Res<()> {
