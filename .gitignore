@@ -11,3 +11,5 @@ lab4/zad6/target/*
 
 lab5/rs-neo4j/target/*
 lab5/data/*
+
+lab6/node_modules/*

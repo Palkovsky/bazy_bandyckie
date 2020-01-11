@@ -1,0 +1,17 @@
+{
+  "name": "take-a-rest",
+  "author": "Patryk Kiepas",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "Przykład RESTful API",
+  "scripts": {
+    "01_HttpServer": "node 01_HttpServer/app.js",
+    "02_UrlParameters": "node 02_UrlParameters/app.js",
+    "03_HttpMethods": "node 03_HttpMethods/app.js",
+    "04_RestDatabase": "node 04_RestDatabase/app.js"
+  },
+  "dependencies": {
+    "express": "^4.16.2",
+    "lowdb": "^1.0.0"
+  }
+}
