@@ -11,7 +11,7 @@
 ** Wysłanie żądań
 Za pomocą CURLa pobieram to co serwuje serwer pod ~/~ i ~/helo~.
 
-#+begin_src bash
+#+begin_src 
 $ curl -sX GET http://localhost:3000/
 <h1>HTTP Server</h1><p>Go to /hello subpage!</p>
 
@@ -60,7 +60,7 @@ app.get("/time", function(request, response) {
 
 ** Test ~/time~
    Wysłanie zapytania:
-   #+begin_src bash
+   #+begin_src 
    $ curl -sX GET http://localhost:3000/time
    <p>1578782499294</p>o
    #+end_src
@@ -74,7 +74,7 @@ app.get("/time", function(request, response) {
 ** Testowanie endpointów
 *** Dla ~/~
     Wyświetlona zostaje lista obsługiowanych endpointów wraz z informacją o parametrach i kluczach query-stringów.
-    #+begin_src bash
+    #+begin_src 
 $ curl -sX GET http://localhost:3000
 <h1>URL Parameters (and Queries)</h1><ul>
       <li>Show normal message (GET /hello/segment1)</li>
@@ -86,12 +86,12 @@ $ curl -sX GET http://localhost:3000
 *** Dla ~/hello/:name~
     To co podamy w miejscu ~:name~ zostanie użyte do budowania odpowiedzi.
     Jeżeli nie podamy nic, to Express uzna, że pytamy o ścieżkę ~/hello/~, która nie jest zdefiniowana.
-    #+begin_src bash
+    #+begin_src 
 $ curl -sX GET http://localhost:3000/hello/Arthur
-<p>Normal message for: Dawid</p>
+<p>Normal message for: Arthur</p>
 
 $ curl -sX GET http://localhost:3000/hello/John
-<p>Normal message for: Andrzej</p>
+<p>Normal message for: John</p>
 
 $ curl -sX GET http://localhost:3000/hello/
 <!DOCTYPE html>
@@ -109,7 +109,7 @@ $ curl -sX GET http://localhost:3000/hello/
 *** Dla ~/hello/:name/:surname?age=_&height=_~
     Poniższe wyniki pokazują, że query-stringi są opcjonalne.
     W wypadku braku odpowiedniego klucza, pole w odpowiedzi ma wartość ~undefined~.
-    Brak walidacji, ponieważ w poach numereycznych można wpisać dowolne ciągi znaków.
+    Brak walidacji, ponieważ w polach numereycznych można wpisać dowolne ciągi znaków.
 
     #+begin_src
     $ curl -sX GET http://localhost:3000/hello/John/Doe
@@ -141,12 +141,13 @@ app.get("/rand/:a/:b/:c", function(req, response) {
 
     let randint = (min, max) => { return Math.floor(Math.random() * (max - min + 1)) + min; },
         rand = [req.params.a, req.params.b, req.params.c][randint(0, 2)];
+
     response.send(`<p>${rand}</p>`);
 });
    #+end_src
 
    Po wysłaniu wielu zapytań pod nowo-zdefiniowany endpoint widać, że wyniki są w miarę losowe:
-   #+begin_src bash
+   #+begin_src 
 $ curl -sX GET http://localhost:3000/rand/lubie/kotlety/schabowe
 <p>schabowe</p>
 
@@ -187,16 +188,16 @@ $ curl -sX GET http://localhost:3000/rand/lubie/kotlety/schabowe
 ** Testowanie endpointów
    Pomiędzy zadaniem drugim, a trzecim zmieniłem shella, więc znak zachęty wygląda inaczej.
 
-   #+begin_src bash
+   #+begin_src 
 # Wyświetlone informacje o endpointach, czyli metoda HTTP oraz ścieżka.
->>> curl -sX GET http://localhost:3000                                                           [2]
+>>> curl -sX GET http://localhost:3000
 <h1>HTTP Methods</h1><ul>
 <li>Show items (GET /item)</li>
 <li>Add an item (PUT /item/:name)</li>
 <li>Remove an item (DELETE /item/:name)</li></ul>
 
 # Nic nie dodaliśmy, więc brak jakichkolwiek itemów.
->>> curl -sX GET http://localhost:3000/item/                                                    [56]
+>>> curl -sX GET http://localhost:3000/item/
 <p>Available items: </p>
 
 # Dodajemy nowy element
@@ -205,7 +206,7 @@ $ curl -sX GET http://localhost:3000/rand/lubie/kotlety/schabowe
 
 # Potwierdzamy, że zostal dodany
 >>> curl -sX GET http://localhost:3000/item/
-<p>Available items: schabowe</p>%
+<p>Available items: schabowe</p>
 
 # Próba dodania istniejącego wpisu się nie powiedzie.
 >>> curl -sX PUT http://localhost:3000/item/schabowe
@@ -451,12 +452,12 @@ Connection: keep-alive
     .get("patients")
     .remove({ id: id })
     .write();
-    response.status(200).send({ message: "Patient removed successfully" });    
+    response.status(200).send({ message: "Patient removed successfully" });
     #+end_src
 
-    #+begin_src 
+    #+begin_src
 # Próba usunięcia niestniejącego da nam kod odpowiedzi 404
->>> curl -siX DELETE http://localhost:3000/patient/3                                                
+>>> curl -siX DELETE http://localhost:3000/patient/3
 HTTP/1.1 404 Not Found
 X-Powered-By: Express
 Content-Type: application/json; charset=utf-8
@@ -468,7 +469,7 @@ Connection: keep-alive
 {"error":"No patient with given id"}
 
 # Upewniamy się, że pacjent 2 istnieje.
->>> curl -siX GET http://localhost:3000/patient/2                                                   
+>>> curl -siX GET http://localhost:3000/patient/2
 HTTP/1.1 200 OK
 X-Powered-By: Express
 Content-Type: text/html; charset=utf-8
@@ -480,7 +481,7 @@ Connection: keep-alive
 {"id":2,"name":"Ferdynand","surname":"Kiepski"}
 
 # Usuwamy pacjenta 2
->>> curl -siX DELETE http://localhost:3000/patient/2                                                
+>>> curl -siX DELETE http://localhost:3000/patient/2
 HTTP/1.1 200 OK
 X-Powered-By: Express
 Content-Type: application/json; charset=utf-8
@@ -492,7 +493,7 @@ Connection: keep-alive
 {"message":"Patient removed successfully"}
 
 # Teraz już go nie ma.
->>> curl -siX GET http://localhost:3000/patient/2                                                   
+>>> curl -siX GET http://localhost:3000/patient/2
 HTTP/1.1 404 Not Found
 X-Powered-By: Express
 Content-Type: application/json; charset=utf-8
@@ -501,7 +502,7 @@ ETag: W/"24-289afur68CcXcCWSsu9/ylO8Xlc"
 Date: Sun, 12 Jan 2020 15:15:26 GMT
 Connection: keep-alive
 
-{"error":"No patient with given id"}    
+{"error":"No patient with given id"}
     #+end_src
 
 *** PUT ~/patient/:id?name=_&surname=_~
