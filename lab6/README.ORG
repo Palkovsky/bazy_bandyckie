@@ -8,7 +8,7 @@
 #+HTML_HEAD: <style>pre.src {background-color: #303030; color: #e5e5e5;}</style>
 
 * Zadanie 1
-** Wysłanie rządań
+** Wysłanie żądań
 Za pomocą CURLa pobieram to co serwuje serwer pod ~/~ i ~/helo~.
 
 #+begin_src bash
@@ -438,6 +438,7 @@ Connection: keep-alive
     Najpierw sprawdzane jest czy pacjent z przekazanym identyfikatorem istnieje.
     Jeśli nie to zwracana odpowiedź z odpowiednim komunikatem i kodem ~404 Not Found~.
     Jeżeli pacjent istnieje to wywoływana jest metoda na ~.remove({ id: id })~, ktora skutuje usunięciem pacjentów z danym identyfikatorem.
+
 
     #+begin_src js
     // Sprawdzanie czy pacjent istnieje
